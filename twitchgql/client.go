@@ -1,8 +1,14 @@
 package twitchgql
 
-import "net/http"
+import (
+	"net/http"
+
+	"github.com/Khan/genqlient/graphql"
+)
 
 const CLIENT_ID = "kimne78kx3ncx6brgo4mv6wki5h1ko"
+
+type VodDataPoint *GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStream
 
 type authedTransport struct {
 	clientID string
@@ -14,13 +20,19 @@ func (t *authedTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return t.wrapped.RoundTrip(req)
 }
 
-func MakeTwitchqlClient() *http.Client {
+func NewTwitchClient() *http.Client {
 	return &http.Client{
 		Transport: &authedTransport{
 			clientID: CLIENT_ID,
 			wrapped:  http.DefaultTransport,
 		},
 	}
+}
+
+func NewTwitchGqlClient() graphql.Client {
+	httpClient := NewTwitchClient()
+	graphqlClient := graphql.NewClient("https://gql.twitch.tv/gql", httpClient)
+	return graphqlClient
 }
 
 //go:generate go run github.com/Khan/genqlient genqlient.yaml

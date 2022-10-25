@@ -27,24 +27,14 @@ func (v *GetStreamsResponse) GetStreams() GetStreamsStreamsStreamConnection { re
 //
 // Paginated list of Streams.
 type GetStreamsStreamsStreamConnection struct {
-	// Used for tracking.
-	GenerationID string                                    `json:"generationID"`
-	PageInfo     GetStreamsStreamsStreamConnectionPageInfo `json:"pageInfo"`
-	// Used for tracking.
-	ResponseID string                                             `json:"responseID"`
-	Edges      []GetStreamsStreamsStreamConnectionEdgesStreamEdge `json:"edges"`
+	PageInfo GetStreamsStreamsStreamConnectionPageInfo          `json:"pageInfo"`
+	Edges    []GetStreamsStreamsStreamConnectionEdgesStreamEdge `json:"edges"`
 }
-
-// GetGenerationID returns GetStreamsStreamsStreamConnection.GenerationID, and is useful for accessing the field via an interface.
-func (v *GetStreamsStreamsStreamConnection) GetGenerationID() string { return v.GenerationID }
 
 // GetPageInfo returns GetStreamsStreamsStreamConnection.PageInfo, and is useful for accessing the field via an interface.
 func (v *GetStreamsStreamsStreamConnection) GetPageInfo() GetStreamsStreamsStreamConnectionPageInfo {
 	return v.PageInfo
 }
-
-// GetResponseID returns GetStreamsStreamsStreamConnection.ResponseID, and is useful for accessing the field via an interface.
-func (v *GetStreamsStreamsStreamConnection) GetResponseID() string { return v.ResponseID }
 
 // GetEdges returns GetStreamsStreamsStreamConnection.Edges, and is useful for accessing the field via an interface.
 func (v *GetStreamsStreamsStreamConnection) GetEdges() []GetStreamsStreamsStreamConnectionEdgesStreamEdge {
@@ -76,10 +66,12 @@ func (v *GetStreamsStreamsStreamConnectionEdgesStreamEdge) GetCursor() string { 
 type GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStream struct {
 	// The stream's unique identifier.
 	Id string `json:"id"`
-	// The user who is broadcasting the live stream.
-	Broadcaster GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStreamBroadcasterUser `json:"broadcaster"`
 	// The number of viewers currently watching the stream.
 	ViewersCount int `json:"viewersCount"`
+	// The user who is broadcasting the live stream.
+	Broadcaster GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStreamBroadcasterUser `json:"broadcaster"`
+	// Information about the game being streamed.
+	Game GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStreamGame `json:"game"`
 	// The time streaming started.
 	CreatedAt time.Time `json:"createdAt"`
 }
@@ -87,14 +79,19 @@ type GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStream struct {
 // GetId returns GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStream.Id, and is useful for accessing the field via an interface.
 func (v *GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStream) GetId() string { return v.Id }
 
+// GetViewersCount returns GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStream.ViewersCount, and is useful for accessing the field via an interface.
+func (v *GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStream) GetViewersCount() int {
+	return v.ViewersCount
+}
+
 // GetBroadcaster returns GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStream.Broadcaster, and is useful for accessing the field via an interface.
 func (v *GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStream) GetBroadcaster() GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStreamBroadcasterUser {
 	return v.Broadcaster
 }
 
-// GetViewersCount returns GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStream.ViewersCount, and is useful for accessing the field via an interface.
-func (v *GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStream) GetViewersCount() int {
-	return v.ViewersCount
+// GetGame returns GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStream.Game, and is useful for accessing the field via an interface.
+func (v *GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStream) GetGame() GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStreamGame {
+	return v.Game
 }
 
 // GetCreatedAt returns GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStream.CreatedAt, and is useful for accessing the field via an interface.
@@ -111,6 +108,8 @@ type GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStreamBroadcasterUser s
 	Id string `json:"id"`
 	// The user's standard alphanumeric Twitch name.
 	Login string `json:"login"`
+	// A User's broadcast settings that persists between streams.
+	BroadcastSettings GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStreamBroadcasterUserBroadcastSettings `json:"broadcastSettings"`
 }
 
 // GetId returns GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStreamBroadcasterUser.Id, and is useful for accessing the field via an interface.
@@ -122,6 +121,62 @@ func (v *GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStreamBroadcasterUs
 func (v *GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStreamBroadcasterUser) GetLogin() string {
 	return v.Login
 }
+
+// GetBroadcastSettings returns GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStreamBroadcasterUser.BroadcastSettings, and is useful for accessing the field via an interface.
+func (v *GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStreamBroadcasterUser) GetBroadcastSettings() GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStreamBroadcasterUserBroadcastSettings {
+	return v.BroadcastSettings
+}
+
+// GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStreamBroadcasterUserBroadcastSettings includes the requested fields of the GraphQL type BroadcastSettings.
+// The GraphQL type's documentation follows.
+//
+// Settings for a User's broadcast that persist between streams.
+type GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStreamBroadcasterUserBroadcastSettings struct {
+	// A flag indicating if the user's broadcast is intended for mature audiences only.
+	IsMature bool `json:"isMature"`
+	// The primary language that the user has configured for their broadcasts. The
+	// default value is "", when the user has not indicated a primary language.
+	Language Language `json:"language"`
+	// The title of the user's broadcast. The default value is "", when the user has not indicated a title.
+	Title string `json:"title"`
+}
+
+// GetIsMature returns GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStreamBroadcasterUserBroadcastSettings.IsMature, and is useful for accessing the field via an interface.
+func (v *GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStreamBroadcasterUserBroadcastSettings) GetIsMature() bool {
+	return v.IsMature
+}
+
+// GetLanguage returns GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStreamBroadcasterUserBroadcastSettings.Language, and is useful for accessing the field via an interface.
+func (v *GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStreamBroadcasterUserBroadcastSettings) GetLanguage() Language {
+	return v.Language
+}
+
+// GetTitle returns GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStreamBroadcasterUserBroadcastSettings.Title, and is useful for accessing the field via an interface.
+func (v *GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStreamBroadcasterUserBroadcastSettings) GetTitle() string {
+	return v.Title
+}
+
+// GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStreamGame includes the requested fields of the GraphQL type Game.
+// The GraphQL type's documentation follows.
+//
+// A Game is often the subject of a Stream on Twitch.
+type GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStreamGame struct {
+	// The name of the game. This string is untranslated.
+	// This field should only be used in limited occassions, like tracking and URLs.
+	// You should use displayName for all all game names shown to the users.
+	Name string `json:"name"`
+	// The game's unique Twitch identifier.
+	// It is used to associate games with product offers.
+	Id string `json:"id"`
+}
+
+// GetName returns GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStreamGame.Name, and is useful for accessing the field via an interface.
+func (v *GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStreamGame) GetName() string {
+	return v.Name
+}
+
+// GetId returns GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStreamGame.Id, and is useful for accessing the field via an interface.
+func (v *GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStreamGame) GetId() string { return v.Id }
 
 // GetStreamsStreamsStreamConnectionPageInfo includes the requested fields of the GraphQL type PageInfo.
 // The GraphQL type's documentation follows.
@@ -203,6 +258,82 @@ type GetUserModsUserModsModConnectionEdgesModEdgeNodeUser struct {
 // GetLogin returns GetUserModsUserModsModConnectionEdgesModEdgeNodeUser.Login, and is useful for accessing the field via an interface.
 func (v *GetUserModsUserModsModConnectionEdgesModEdgeNodeUser) GetLogin() string { return v.Login }
 
+// An enumeration of broadcaster languages.
+type Language string
+
+const (
+	// Arabic.
+	LanguageAr Language = "AR"
+	// American Sign Language.
+	LanguageAsl Language = "ASL"
+	// Bulgarian.
+	LanguageBg Language = "BG"
+	// Catalan.
+	LanguageCa Language = "CA"
+	// Czech.
+	LanguageCs Language = "CS"
+	// Danish.
+	LanguageDa Language = "DA"
+	// German.
+	LanguageDe Language = "DE"
+	// Greek.
+	LanguageEl Language = "EL"
+	// English.
+	LanguageEn Language = "EN"
+	// Spanish.
+	LanguageEs Language = "ES"
+	// Finnish.
+	LanguageFi Language = "FI"
+	// French.
+	LanguageFr Language = "FR"
+	// Hindi.
+	LanguageHi Language = "HI"
+	// Hungarian.
+	LanguageHu Language = "HU"
+	// Indonesian.
+	LanguageId Language = "ID"
+	// Italian.
+	LanguageIt Language = "IT"
+	// Japanese.
+	LanguageJa Language = "JA"
+	// Korean.
+	LanguageKo Language = "KO"
+	// Malay.
+	LanguageMs Language = "MS"
+	// Dutch.
+	LanguageNl Language = "NL"
+	// Norwegian.
+	LanguageNo Language = "NO"
+	// Other.
+	LanguageOther Language = "OTHER"
+	// Polish.
+	LanguagePl Language = "PL"
+	// Portuguese.
+	LanguagePt Language = "PT"
+	// Romanian.
+	LanguageRo Language = "RO"
+	// Russian.
+	LanguageRu Language = "RU"
+	// Slovak.
+	LanguageSk Language = "SK"
+	// Swedish.
+	LanguageSv Language = "SV"
+	// Thai.
+	LanguageTh Language = "TH"
+	// Tagalog.
+	LanguageTl Language = "TL"
+	// Turkish.
+	LanguageTr Language = "TR"
+	// Ukrainian.
+	LanguageUk Language = "UK"
+	// Vietnamese.
+	LanguageVi Language = "VI"
+	// Chinese.
+	LanguageZh Language = "ZH"
+	// Chinese (Hong Kong).
+	LanguageZhHk Language = "ZH_HK"
+)
+
 // __GetStreamsInput is used internally by genqlient
 type __GetStreamsInput struct {
 	First  int    `json:"first"`
@@ -236,17 +367,25 @@ func GetStreams(
 		Query: `
 query GetStreams ($first: Int!, $cursor: Cursor!) {
 	streams(first: $first, after: $cursor) {
-		generationID
 		pageInfo {
 			hasNextPage
 		}
-		responseID
 		edges {
 			node {
 				id
+				viewersCount
 				broadcaster {
 					id
 					login
+					broadcastSettings {
+						isMature
+						language
+						title
+					}
+				}
+				game {
+					name
+					id
 				}
 				viewersCount
 				createdAt
