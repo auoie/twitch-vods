@@ -25,6 +25,8 @@ type liveVodKey struct {
 	streamId    string
 }
 
+// streamerId acts as a primary key
+// streamId also acts as a primary key
 type liveVodsPriorityQueue struct {
 	streamerIdToVod  map[string]*LiveVod // at most one VOD per streamer id
 	streamIdToVod    map[string]*LiveVod // at most one VOD per stream id
@@ -46,36 +48,12 @@ func CreateNewLiveVodsPriorityQueue() *liveVodsPriorityQueue {
 	}
 }
 
-func (vods *liveVodsPriorityQueue) GetVodByStreamId(streamId string) (*LiveVod, error) {
-	result, ok := vods.streamIdToVod[streamId]
-	if !ok {
-		return nil, errors.New("streamId not present")
-	}
-	return result, nil
-}
-
-func (vods *liveVodsPriorityQueue) GetVodByStreamerId(streamerId string) (*LiveVod, error) {
-	result, ok := vods.streamerIdToVod[streamerId]
-	if !ok {
-		return nil, errors.New("streamerId not present")
-	}
-	return result, nil
-}
-
 func (vods *liveVodsPriorityQueue) GetStalestStream() (*LiveVod, error) {
 	key, vod := vods.lastUpdatedToVod.Min()
 	if key == nil || vod == nil {
 		return nil, errors.New("vods is empty")
 	}
 	return vod, nil
-}
-
-func (vods *liveVodsPriorityQueue) RemoveVodByStreamId(streamId string) {
-	vod, ok := vods.streamIdToVod[streamId]
-	if !ok {
-		return
-	}
-	vods.RemoveVod(vod)
 }
 
 func (vods *liveVodsPriorityQueue) RemoveVod(vod *LiveVod) {
