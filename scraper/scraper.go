@@ -186,6 +186,7 @@ func hlsWorkerFetchCompressSend(
 // Context to cancel the scraping operation
 // timelimit for each of the graphql requests
 // This function scares me.
+// libdeflateCompressionLevel seems best when it's 1. The level of compression is good enough and it is fastest.
 func ScrapeTwitchLiveVodsWithGqlApi(
 	ctx context.Context,
 	twitchGqlFetcherDelay time.Duration,

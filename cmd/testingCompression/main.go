@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"io"
 	"log"
 	"os"
@@ -17,20 +16,20 @@ var (
 func main() {
 	flag.Parse()
 	compressionLevel := *levelPointer
-	compressor, err := libdeflate.NewCompressorLevel(compressionLevel)
+	c, err := libdeflate.NewCompressorLevel(compressionLevel)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer compressor.Close()
+	defer c.Close()
 	bytes, err := io.ReadAll(os.Stdin)
 	if err != nil {
 		log.Fatal(err)
 	}
 	comp := make([]byte, len(bytes))
-	n, _, err := compressor.Compress(bytes, comp, libdeflate.ModeGzip)
+	n, _, err := c.Compress(bytes, comp, libdeflate.ModeGzip)
 	if err != nil {
 		log.Fatal(err)
 	}
-	comp = comp[n:]
-	fmt.Print(comp)
+	comp = comp[:n]
+	os.Stdout.Write(comp)
 }
