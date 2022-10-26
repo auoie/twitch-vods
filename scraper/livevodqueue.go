@@ -48,6 +48,10 @@ func CreateNewLiveVodsPriorityQueue() *liveVodsPriorityQueue {
 	}
 }
 
+func (vods *liveVodsPriorityQueue) Size() int {
+	return vods.lastUpdatedToVod.Size()
+}
+
 func (vods *liveVodsPriorityQueue) GetStalestStream() (*LiveVod, error) {
 	key, vod := vods.lastUpdatedToVod.Min()
 	if key == nil || vod == nil {
@@ -57,8 +61,7 @@ func (vods *liveVodsPriorityQueue) GetStalestStream() (*LiveVod, error) {
 }
 
 func (vods *liveVodsPriorityQueue) RemoveVod(vod *LiveVod) {
-	key := &liveVodKey{lastUpdated: vod.LastUpdated, streamId: vod.StreamId}
-	vods.lastUpdatedToVod.Remove(key)
+	vods.lastUpdatedToVod.Remove(vod.getLiveVodsKey())
 	delete(vods.streamIdToVod, vod.StreamId)
 	delete(vods.streamerIdToVod, vod.StreamerId)
 }
