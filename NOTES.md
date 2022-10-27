@@ -77,6 +77,9 @@ See [here](https://eli.thegreenplace.net/2021/a-comprehensive-guide-to-go-genera
 
 ## Postgres
 
+I'm using Prisma JS to generate automatically generate the SQL table code and
+apply it to the SQL database
+
 ```bash
 docker run -d \
   --name sensitive_data \
@@ -85,5 +88,43 @@ docker run -d \
   -e POSTGRES_DB=twitch \
   -p 5432:5432 \
   postgres
+npx prisma migrate dev
 pgcli postgresql://govods:password@localhost:5432/twitch
 ```
+
+I use the `sqls.yml` VSCode extension for autocompletion.
+My file `.vscode/sqls.yml` looks like
+
+```yaml
+lowercaseKeywords: false
+connections:
+  - alias: govods_project
+    driver: postgresql
+    proto: tcp
+    user: govods
+    passwd: password
+    host: localhost
+    port: 5432
+    dbName: twitch
+```
+
+and my file `.vscode/settings.json` looks like
+
+```json
+{
+  "sqls.languageServerFlags": ["-config", "./.vscode/sqls.yml"]
+}
+```
+
+I use `sqlc` to generate Go code to run SQL queries.
+
+```bash
+go get -u github.com/kyleconroy/sqlc/cmd/sqlc@latest
+# then add it to ./tools/tools.go
+go run github.com/kyleconroy/sqlc/cmd/sqlc --help
+go get -u github.com/jackc/pgx/v5 # this is required to :copyfrom
+```
+
+In order to perform dynamic-sized `IN` queries,
+see [here](https://github.com/kyleconroy/sqlc/issues/167), [here](https://github.com/kyleconroy/sqlc/issues/216), [here](https://github.com/kyleconroy/sqlc/issues/218).
+Basically, you need to use the `:copyfrom` annotation.

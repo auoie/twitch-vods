@@ -1,9 +1,0 @@
-{
-  "name": "govods-project",
-  "adapter": "postgres",
-  "host": "localhost",
-  "port": 5432,
-  "user": "govods",
-  "password": "password",
-  "database": "twitch"
-}

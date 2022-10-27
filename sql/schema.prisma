@@ -3,12 +3,12 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Stream {
-  id            String   @id @default(uuid())
-  streamerId    String
-  streamId      String   @unique
-  startTime     DateTime
-  maxViews      Int
-  lastUpdatedAt DateTime
-  timeSeries    Bytes
+model streams {
+  id              String   @id @default(uuid())
+  streamer_id     String
+  stream_id       String   @unique
+  start_time      DateTime
+  max_views       Int
+  last_updated_at DateTime
+  time_series     Bytes
 }
