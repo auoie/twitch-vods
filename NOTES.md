@@ -74,3 +74,16 @@ Because of the annotation
 
 it is possible to just use `go generate ./...` to generate the client code.
 See [here](https://eli.thegreenplace.net/2021/a-comprehensive-guide-to-go-generate/) for further details on code generation in Go.
+
+## Postgres
+
+```bash
+docker run -d \
+  --name sensitive_data \
+  -e POSTGRES_USER=govods \
+  -e POSTGRES_PASSWORD=password \
+  -e POSTGRES_DB=twitch \
+  -p 5432:5432 \
+  postgres
+pgcli postgresql://govods:password@localhost:5432/twitch
+```
