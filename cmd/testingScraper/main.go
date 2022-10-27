@@ -10,7 +10,7 @@ import (
 func main() {
 	scraper.ScrapeTwitchLiveVodsWithGqlApi(
 		context.Background(),
-		500*time.Millisecond,
+		333*time.Millisecond,
 		5*time.Second,
 		10*time.Minute,
 		100000,
@@ -18,5 +18,6 @@ func main() {
 		time.Second,
 		5*time.Minute,
 		1,
+		5,
 	)
 }

@@ -24,8 +24,24 @@ type LiveVod struct {
 }
 
 type VodResult struct {
-	Vod      *LiveVod
-	HlsBytes []byte
+	Vod           *LiveVod
+	HlsBytes      []byte
+	HlsBytesFound bool
+}
+
+func edgeNodesMatchingAndNonEmpty(a []twitchgql.GetStreamsStreamsStreamConnectionEdgesStreamEdge, b []twitchgql.GetStreamsStreamsStreamConnectionEdgesStreamEdge) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	if len(a) == 0 {
+		return false
+	}
+	for index := range a {
+		if a[index].Node.Id != b[index].Node.Id {
+			return false
+		}
+	}
+	return true
 }
 
 func (vod *LiveVod) GetVideoData() *vods.VideoData {
@@ -39,7 +55,8 @@ func fetchTwitchGqlForever(
 	twitchGqlFetcherDelay time.Duration,
 	cursorResetThreshold time.Duration,
 	oldVodEvictionThreshold time.Duration,
-	oldVodsCh chan []*LiveVod) {
+	oldVodsCh chan []*LiveVod,
+	minViewerCountToObserve int) {
 	log.Println("Inside fetchTwitchGqlForever...")
 	log.Println(fmt.Sprint("Fetcher delay: ", twitchGqlFetcherDelay))
 	liveVodQueue := CreateNewLiveVodsPriorityQueue()
@@ -55,8 +72,11 @@ func fetchTwitchGqlForever(
 		resetCursorTimeout = time.Now().Add(cursorResetThreshold)
 	}
 	log.Println("Starting twitchgql infinite for loop.")
+	prevEdges := []twitchgql.GetStreamsStreamsStreamConnectionEdgesStreamEdge{}
+	debugMod := 10
 	for {
 		debugIndex++
+		debugQueueSizeStart := liveVodQueue.Size()
 		if time.Now().After(resetCursorTimeout) {
 			log.Println(fmt.Sprint("Reset cursor because we've been fetching for: ", cursorResetThreshold))
 			resetCursor()
@@ -80,22 +100,31 @@ func fetchTwitchGqlForever(
 			log.Println("streams.Streams.PageInfo does not have next page")
 			resetCursor()
 		} else {
-			cursor = edges[len(edges)-1].Cursor
-			if debugIndex%10 == 0 {
+			if debugIndex%debugMod == 0 {
+				log.Println()
 				log.Println("First and last stream")
 				log.Println(edges[0])
 				log.Println(edges[len(edges)-1])
-				log.Println(fmt.Sprint("Live VOD queue size: ", liveVodQueue.Size()))
+				log.Println(fmt.Sprint("Live VOD queue size start: ", debugQueueSizeStart))
+			}
+			if edgeNodesMatchingAndNonEmpty(prevEdges, edges) {
+				log.Println("prevEdges and edges node ids:")
+				log.Println("prevEdges: ", prevEdges)
+				log.Println("edges: ", edges)
+				cursor = edges[len(edges)-1].Cursor
+			} else {
+				cursor = edges[2*len(edges)/3].Cursor
 			}
 		}
+		prevEdges = edges
 		oldVods := []*LiveVod{}
-		allVodsAtMostOneView := true
+		allVodsLessThanMinViewerCount := true
 		curTime := time.Now()
 		for _, edge := range edges {
-			if edge.Node.ViewersCount <= 1 {
+			if edge.Node.ViewersCount < minViewerCountToObserve {
 				continue
 			}
-			allVodsAtMostOneView = false
+			allVodsLessThanMinViewerCount = false
 			evictedVod, err := liveVodQueue.UpsertVod(
 				curTime,
 				twitchgql.VodDataPoint(&edge.Node),
@@ -106,8 +135,15 @@ func fetchTwitchGqlForever(
 			log.Println("Streamer restarted stream: ", evictedVod.StreamerLoginAtStart)
 			oldVods = append(oldVods, evictedVod)
 		}
-		if allVodsAtMostOneView {
-			log.Println("All vods at most one view")
+		if debugIndex%debugMod == 0 {
+			log.Println(fmt.Sprint("Live VOD queue size after upserts: ", liveVodQueue.Size()))
+		}
+		debugNumRestartedStreams := len(oldVods)
+		if debugNumRestartedStreams > 0 {
+			log.Println(fmt.Sprint("num restarted streams: ", debugNumRestartedStreams))
+		}
+		if allVodsLessThanMinViewerCount {
+			log.Println("All vods less than min viewer count")
 			resetCursor()
 		}
 		oldestTimeAllowed := curTime.Add(-oldVodEvictionThreshold)
@@ -121,6 +157,13 @@ func fetchTwitchGqlForever(
 			}
 			liveVodQueue.RemoveVod(stalestVod)
 			oldVods = append(oldVods, stalestVod)
+		}
+		if debugIndex%debugMod == 0 {
+			log.Println(fmt.Sprint("Live VOD queue size after removing stale VODS: ", liveVodQueue.Size()))
+		}
+		debugNumStaleVods := len(oldVods) - debugNumRestartedStreams
+		if debugNumStaleVods > 0 {
+			log.Println(fmt.Sprint("num stale vods: ", debugNumStaleVods))
 		}
 		select {
 		case <-ctx.Done():
@@ -190,10 +233,23 @@ func hlsWorkerFetchCompressSend(
 		}
 		dwp, err := vods.GetFirstValidDwp(ctx, oldVod.GetVideoData().GetDomainWithPathsList(vods.DOMAINS, 1))
 		if err != nil {
+			log.Println(fmt.Sprint("Link was not found for ", oldVod.StreamerLoginAtStart, " because: ", err))
+			select {
+			case <-ctx.Done():
+				return
+			case resultsCh <- &VodResult{Vod: oldVod, HlsBytes: nil, HlsBytesFound: false}:
+			}
 			continue
 		}
 		mediapl, err := vods.DecodeMediaPlaylistFilterNilSegments(dwp.Body, true)
 		if err != nil {
+			log.Println(fmt.Sprint("Removing nil segments for ", oldVod.StreamerLoginAtStart, " failed because: ", err))
+			log.Println(mediapl.String())
+			select {
+			case <-ctx.Done():
+				return
+			case resultsCh <- &VodResult{Vod: oldVod, HlsBytes: nil, HlsBytesFound: false}:
+			}
 			continue
 		}
 		vods.MuteMediaSegments(mediapl)
@@ -202,10 +258,16 @@ func hlsWorkerFetchCompressSend(
 		compressedBytes := make([]byte, len(mediaplBytes))
 		n, _, err := compressor.Compress(mediaplBytes, compressedBytes, libdeflate.ModeGzip)
 		if err != nil {
+			log.Println(fmt.Sprint("Compressing failed for ", oldVod.StreamerLoginAtStart, " because: ", err))
+			select {
+			case <-ctx.Done():
+				return
+			case resultsCh <- &VodResult{Vod: oldVod, HlsBytes: nil, HlsBytesFound: false}:
+			}
 			continue
 		}
 		compressedBytes = compressedBytes[:n]
-		result := &VodResult{Vod: oldVod, HlsBytes: compressedBytes}
+		result := &VodResult{Vod: oldVod, HlsBytes: compressedBytes, HlsBytesFound: true}
 		select {
 		case <-ctx.Done():
 			return
@@ -227,7 +289,8 @@ func ScrapeTwitchLiveVodsWithGqlApi(
 	numHlsFetchers int,
 	hlsFetcherDelay time.Duration,
 	cursorResetThreshold time.Duration,
-	libdeflateCompressionLevel int) error {
+	libdeflateCompressionLevel int,
+	minViewerCountToObserve int) error {
 	log.Println("Starting scraping...")
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -236,7 +299,7 @@ func ScrapeTwitchLiveVodsWithGqlApi(
 	oldVodJobsCh := make(chan *LiveVod)
 	resultsCh := make(chan *VodResult)
 	log.Println("Made twitchgql client and channels.")
-	go fetchTwitchGqlForever(ctx, client, twitchGqlRequestTimeLimit, twitchGqlFetcherDelay, cursorResetThreshold, oldVodEvictionThreshold, oldVodsCh)
+	go fetchTwitchGqlForever(ctx, client, twitchGqlRequestTimeLimit, twitchGqlFetcherDelay, cursorResetThreshold, oldVodEvictionThreshold, oldVodsCh, minViewerCountToObserve)
 	go processOldVodJobs(ctx, oldVodsCh, oldVodJobsCh, maxOldVodsQueueSize)
 	for i := 0; i < numHlsFetchers; i++ {
 		compressor, err := libdeflate.NewCompressorLevel(libdeflateCompressionLevel)
