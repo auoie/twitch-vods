@@ -117,9 +117,22 @@ func (domainWithPaths *DomainWithPaths) ToListOfDomainWithPath() []*DomainWithPa
 }
 
 func (domainWithPaths *DomainWithPaths) GetFirstValidDWP(ctx context.Context) (*ValidDwpResponse, error) {
+	domainWithPathList := domainWithPaths.ToListOfDomainWithPath()
+	if len(domainWithPathList) < 1 {
+		return nil, errors.New("no urls")
+	}
+	// establish TCP connection for reuse
+	// https://groups.google.com/g/golang-nuts/c/5T5aiDRl_cw/m/zYPGtCOYBwAJ
+	firstDomainWithPath := domainWithPathList[0]
+	body, err := firstDomainWithPath.GetM3U8Body(ctx)
+	if err == nil {
+		return &ValidDwpResponse{Dwp: firstDomainWithPath, Body: body}, nil
+	}
+	// reuse with other requests
+	restDomainWithPathList := domainWithPathList[1:]
 	return firstnonerr.GetFirstNonError(
 		ctx,
-		domainWithPaths.ToListOfDomainWithPath(),
+		restDomainWithPathList,
 		0,
 		func(ctx context.Context, item *DomainWithPath) (*ValidDwpResponse, error) {
 			body, err := item.GetM3U8Body(ctx)
@@ -128,6 +141,7 @@ func (domainWithPaths *DomainWithPaths) GetFirstValidDWP(ctx context.Context) (*
 }
 
 func GetFirstValidDwp(ctx context.Context, domainWithPathsList []*DomainWithPaths) (*ValidDwpResponse, error) {
+
 	return firstnonerr.GetFirstNonError(
 		ctx,
 		domainWithPathsList,
