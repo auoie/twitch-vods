@@ -151,6 +151,10 @@ func GetFirstValidDwp(ctx context.Context, domainWithPathsList []*DomainWithPath
 		})
 }
 
+func (d *DomainWithPath) GetDomain() string {
+	return d.domain
+}
+
 func (d *DomainWithPath) GetVideoData() *VideoData {
 	return d.path.videoData
 }
