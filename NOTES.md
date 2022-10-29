@@ -81,7 +81,7 @@ I'm using Prisma JS to generate automatically generate the SQL table code and
 apply it to the SQL database
 
 ```bash
-docker run -d \
+docker run -d --restart always\
   --name sensitive_data \
   -e POSTGRES_USER=govods \
   -e POSTGRES_PASSWORD=password \

@@ -13,6 +13,11 @@ import (
 	"github.com/auoie/goVods/vods"
 )
 
+type VodDataPoint struct {
+	ResponseReturnedTime time.Time
+	Node                 twitchgql.VodNode
+}
+
 type LiveVod struct {
 	StreamerId           string
 	StreamId             string
@@ -20,7 +25,10 @@ type LiveVod struct {
 	StreamerLoginAtStart string
 	MaxViews             int
 	LastUpdated          time.Time
-	TimeSeries           []twitchgql.VodDataPoint
+
+	// At the moment, I don't do anything with this. Storing it would use up a lot of space.
+	// Should I serialize it with something like Protobuf and then GZIP it?
+	TimeSeries []VodDataPoint // Should I use an OLAP database (Clickhouse or TimeScale)?
 }
 
 type VodResult struct {
@@ -83,6 +91,7 @@ func fetchTwitchGqlForever(
 		}
 		requestCtx, requestCancel := context.WithTimeout(ctx, twitchGqlRequestTimeLimit)
 		streams, err := twitchgql.GetStreams(requestCtx, client, 30, cursor)
+		responseReturnedTime := time.Now()
 		requestCancel()
 		select {
 		case <-ctx.Done():
@@ -119,15 +128,14 @@ func fetchTwitchGqlForever(
 		prevEdges = edges
 		oldVods := []*LiveVod{}
 		allVodsLessThanMinViewerCount := true
-		curTime := time.Now()
 		for _, edge := range edges {
 			if edge.Node.ViewersCount < minViewerCountToObserve {
 				continue
 			}
 			allVodsLessThanMinViewerCount = false
 			evictedVod, err := liveVodQueue.UpsertVod(
-				curTime,
-				twitchgql.VodDataPoint(&edge.Node),
+				responseReturnedTime,
+				VodDataPoint{Node: &edge.Node, ResponseReturnedTime: responseReturnedTime},
 			)
 			if err != nil {
 				continue
@@ -146,7 +154,7 @@ func fetchTwitchGqlForever(
 			log.Println("All vods less than min viewer count")
 			resetCursor()
 		}
-		oldestTimeAllowed := curTime.Add(-oldVodEvictionThreshold)
+		oldestTimeAllowed := responseReturnedTime.Add(-oldVodEvictionThreshold)
 		for {
 			stalestVod, err := liveVodQueue.GetStalestStream()
 			if err != nil {

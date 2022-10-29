@@ -13,7 +13,7 @@ func main() {
 		333*time.Millisecond,
 		5*time.Second,
 		10*time.Minute,
-		100000,
+		20000,
 		5,
 		time.Second,
 		5*time.Minute,

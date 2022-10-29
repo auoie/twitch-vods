@@ -4,7 +4,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/auoie/goVods/twitchgql"
 	"github.com/monitor1379/yagods/maps/treemap"
 	"github.com/monitor1379/yagods/utils"
 )
@@ -72,12 +71,13 @@ func (vods *liveVodsPriorityQueue) RemoveVod(vod *LiveVod) {
 // This code scares me. It's probably buggy.
 func (vods *liveVodsPriorityQueue) UpsertVod(
 	curTime time.Time,
-	data twitchgql.VodDataPoint) (*LiveVod, error) {
-	streamerId := data.Broadcaster.Id
-	streamerLogin := data.Broadcaster.Login
-	streamId := data.Id
-	startTime := data.CreatedAt
-	viewers := data.ViewersCount
+	data VodDataPoint) (*LiveVod, error) {
+	node := data.Node
+	streamerId := node.Broadcaster.Id
+	streamerLogin := node.Broadcaster.Login
+	streamId := node.Id
+	startTime := node.CreatedAt
+	viewers := node.ViewersCount
 	curVod, ok := vods.streamerIdToVod[streamerId] // check if the streamer has an old stream
 	if !ok {
 		newVod := &LiveVod{
@@ -87,7 +87,7 @@ func (vods *liveVodsPriorityQueue) UpsertVod(
 			StreamerLoginAtStart: streamerLogin,
 			MaxViews:             viewers,
 			LastUpdated:          curTime,
-			TimeSeries:           []twitchgql.VodDataPoint{data},
+			TimeSeries:           []VodDataPoint{data},
 		}
 		vods.lastUpdatedToVod.Put(newVod.getLiveVodsKey(), newVod)
 		vods.streamIdToVod[streamId] = newVod
@@ -102,7 +102,7 @@ func (vods *liveVodsPriorityQueue) UpsertVod(
 			StreamerLoginAtStart: streamerLogin,
 			MaxViews:             viewers,
 			LastUpdated:          curTime,
-			TimeSeries:           []twitchgql.VodDataPoint{data},
+			TimeSeries:           []VodDataPoint{data},
 		}
 		vods.lastUpdatedToVod.Put(newVod.getLiveVodsKey(), newVod)
 		vods.streamIdToVod[streamId] = newVod
