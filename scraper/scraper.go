@@ -197,7 +197,12 @@ func processOldVodJobs(
 		oldVod, _ := oldVodsOrderedByViews.PopHighViewCount()
 		return oldVod
 	}
+	debugCount := -1
 	for {
+		debugCount++
+		if debugCount%10 == 0 {
+			log.Println(fmt.Sprint("oldVodsOrderedByViews size: ", oldVodsOrderedByViews.Size()))
+		}
 		select {
 		case <-ctx.Done():
 			return
