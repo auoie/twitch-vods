@@ -34,7 +34,7 @@ func (r iteratorForAddManyStreams) Values() ([]interface{}, error) {
 		r.rows[0].StartTime,
 		r.rows[0].StreamerID,
 		r.rows[0].StreamID,
-		r.rows[0].TimeSeries,
+		r.rows[0].StreamerLoginAtStart,
 	}, nil
 }
 
@@ -43,5 +43,5 @@ func (r iteratorForAddManyStreams) Err() error {
 }
 
 func (q *Queries) AddManyStreams(ctx context.Context, arg []AddManyStreamsParams) (int64, error) {
-	return q.db.CopyFrom(ctx, []string{"streams"}, []string{"last_updated_at", "max_views", "start_time", "streamer_id", "stream_id", "time_series"}, &iteratorForAddManyStreams{rows: arg})
+	return q.db.CopyFrom(ctx, []string{"streams"}, []string{"last_updated_at", "max_views", "start_time", "streamer_id", "stream_id", "streamer_login_at_start"}, &iteratorForAddManyStreams{rows: arg})
 }

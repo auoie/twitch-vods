@@ -8,12 +8,19 @@ import (
 	"time"
 )
 
+type Recording struct {
+	ID           string
+	FetchedAt    time.Time
+	GzippedBytes []byte
+	StreamsID    string
+}
+
 type Stream struct {
-	ID            string
-	StreamerID    string
-	StreamID      string
-	StartTime     time.Time
-	MaxViews      int32
-	LastUpdatedAt time.Time
-	TimeSeries    []byte
+	ID                   string
+	StreamerID           string
+	StreamID             string
+	StartTime            time.Time
+	MaxViews             int32
+	LastUpdatedAt        time.Time
+	StreamerLoginAtStart string
 }

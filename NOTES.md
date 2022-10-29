@@ -128,3 +128,36 @@ go get -u github.com/jackc/pgx/v5 # this is required to :copyfrom
 In order to perform dynamic-sized `IN` queries,
 see [here](https://github.com/kyleconroy/sqlc/issues/167), [here](https://github.com/kyleconroy/sqlc/issues/216), [here](https://github.com/kyleconroy/sqlc/issues/218).
 Basically, you need to use the `:copyfrom` annotation.
+
+`sqlc` doesn't really support updating or upserting many rows in a single query.
+
+```sql
+-- name: UpdateManyStreams :copyfrom
+UPDATE
+  streams
+SET
+  last_updated_at = $1, max_views = $2
+WHERE
+  stream_id = $1;
+
+-- name: UpsertManyStreams :copyfrom
+INSERT INTO
+  streams (last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start)
+VALUES
+  ($1, $2, $3, $4, $5, $6)
+ON CONFLICT
+  (stream_id)
+DO
+  UPDATE SET
+    last_updated_at = EXCLUDED.last_updated_at,
+    max_views = GREATEST(max_views, EXCLUDED.max_views);
+```
+
+I got the errors
+
+```text
+# package sqlvods
+sql/queries.sql:50:1: :copyfrom requires an INSERT INTO statement
+sql/queries.sql:58:1: :copyfrom is not compatible with ON CONFLICT
+exit status 1
+```

@@ -4,11 +4,22 @@ datasource db {
 }
 
 model streams {
-  id              String   @id @default(uuid())
-  streamer_id     String
-  stream_id       String   @unique
-  start_time      DateTime
-  max_views       Int
-  last_updated_at DateTime
-  time_series     Bytes
+  id                      String      @id @default(uuid())
+  streamer_id             String
+  stream_id               String      @unique
+  start_time              DateTime
+  max_views               Int
+  last_updated_at         DateTime
+  streamer_login_at_start String
+  recordings              recordings?
+
+  @@index([streamer_id, start_time(sort: Desc)])
+}
+
+model recordings {
+  id            String   @id @default(uuid())
+  fetched_at    DateTime
+  gzipped_bytes Bytes
+  stream        streams  @relation(fields: [streams_id], references: [id])
+  streams_id    String   @unique
 }
