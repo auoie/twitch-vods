@@ -28,7 +28,8 @@ type LiveVod struct {
 
 	// At the moment, I don't do anything with this. Storing it would use up a lot of space.
 	// Should I serialize it with something like Protobuf and then GZIP it?
-	TimeSeries []VodDataPoint // Should I use an OLAP database (Clickhouse or TimeScale)?
+	// Should I use an OLAP database (Clickhouse or TimeScale)?
+	// TimeSeries []VodDataPoint
 }
 
 type VodResult struct {

@@ -6,6 +6,14 @@ FROM
 WHERE
   stream_id = $1;
 
+-- name: GetStreamsByStreamId :many
+SELECT 
+  id, last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start
+FROM
+  streams
+WHERE
+  stream_id = $1;
+
 -- name: GetStreamForEachStreamId :many
 SELECT
   id, last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start

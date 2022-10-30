@@ -87,7 +87,6 @@ func (vods *liveVodsPriorityQueue) UpsertVod(
 			StreamerLoginAtStart: streamerLogin,
 			MaxViews:             viewers,
 			LastUpdated:          curTime,
-			TimeSeries:           []VodDataPoint{data},
 		}
 		vods.lastUpdatedToVod.Put(newVod.getLiveVodsKey(), newVod)
 		vods.streamIdToVod[streamId] = newVod
@@ -102,7 +101,6 @@ func (vods *liveVodsPriorityQueue) UpsertVod(
 			StreamerLoginAtStart: streamerLogin,
 			MaxViews:             viewers,
 			LastUpdated:          curTime,
-			TimeSeries:           []VodDataPoint{data},
 		}
 		vods.lastUpdatedToVod.Put(newVod.getLiveVodsKey(), newVod)
 		vods.streamIdToVod[streamId] = newVod
@@ -112,7 +110,6 @@ func (vods *liveVodsPriorityQueue) UpsertVod(
 		vods.RemoveVod(curVod)
 		curVod.MaxViews = getMax(viewers, curVod.MaxViews)
 		curVod.LastUpdated = curTime
-		curVod.TimeSeries = append(curVod.TimeSeries, data)
 		vods.lastUpdatedToVod.Put(curVod.getLiveVodsKey(), curVod)
 		vods.streamIdToVod[streamId] = curVod
 		vods.streamerIdToVod[streamerId] = curVod

@@ -379,6 +379,53 @@ func (q *Queries) GetStreamForEachStreamId(ctx context.Context, dollar_1 []strin
 	return items, nil
 }
 
+const getStreamsByStreamId = `-- name: GetStreamsByStreamId :many
+SELECT 
+  id, last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start
+FROM
+  streams
+WHERE
+  stream_id = $1
+`
+
+type GetStreamsByStreamIdRow struct {
+	ID                   uuid.UUID
+	LastUpdatedAt        time.Time
+	MaxViews             int64
+	StartTime            time.Time
+	StreamerID           string
+	StreamID             string
+	StreamerLoginAtStart string
+}
+
+func (q *Queries) GetStreamsByStreamId(ctx context.Context, streamID string) ([]GetStreamsByStreamIdRow, error) {
+	rows, err := q.db.Query(ctx, getStreamsByStreamId, streamID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetStreamsByStreamIdRow
+	for rows.Next() {
+		var i GetStreamsByStreamIdRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.LastUpdatedAt,
+			&i.MaxViews,
+			&i.StartTime,
+			&i.StreamerID,
+			&i.StreamID,
+			&i.StreamerLoginAtStart,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateStream = `-- name: UpdateStream :exec
 UPDATE
   streams 
