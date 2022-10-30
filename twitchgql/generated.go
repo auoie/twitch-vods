@@ -194,70 +194,6 @@ type GetStreamsStreamsStreamConnectionPageInfo struct {
 // GetHasNextPage returns GetStreamsStreamsStreamConnectionPageInfo.HasNextPage, and is useful for accessing the field via an interface.
 func (v *GetStreamsStreamsStreamConnectionPageInfo) GetHasNextPage() bool { return v.HasNextPage }
 
-// GetUserModsResponse is returned by GetUserMods on success.
-type GetUserModsResponse struct {
-	// Get a user by their ID or login.
-	// If no ID or login is provided, null is returned.
-	// Lookup type can tell the resolver to include all users (inclusing deleted and
-	// suspended accounts) on the lookup, defaults to only retrieve active users.
-	User GetUserModsUser `json:"user"`
-}
-
-// GetUser returns GetUserModsResponse.User, and is useful for accessing the field via an interface.
-func (v *GetUserModsResponse) GetUser() GetUserModsUser { return v.User }
-
-// GetUserModsUser includes the requested fields of the GraphQL type User.
-// The GraphQL type's documentation follows.
-//
-// Twitch user.
-type GetUserModsUser struct {
-	// Returns a paginated list of channel moderators.
-	Mods GetUserModsUserModsModConnection `json:"mods"`
-}
-
-// GetMods returns GetUserModsUser.Mods, and is useful for accessing the field via an interface.
-func (v *GetUserModsUser) GetMods() GetUserModsUserModsModConnection { return v.Mods }
-
-// GetUserModsUserModsModConnection includes the requested fields of the GraphQL type ModConnection.
-// The GraphQL type's documentation follows.
-//
-// Paginated list of moderators of a channel.
-type GetUserModsUserModsModConnection struct {
-	// The elements of the list.
-	Edges []GetUserModsUserModsModConnectionEdgesModEdge `json:"edges"`
-}
-
-// GetEdges returns GetUserModsUserModsModConnection.Edges, and is useful for accessing the field via an interface.
-func (v *GetUserModsUserModsModConnection) GetEdges() []GetUserModsUserModsModConnectionEdgesModEdge {
-	return v.Edges
-}
-
-// GetUserModsUserModsModConnectionEdgesModEdge includes the requested fields of the GraphQL type ModEdge.
-// The GraphQL type's documentation follows.
-//
-// Element in a list of moderators of a channel.
-type GetUserModsUserModsModConnectionEdgesModEdge struct {
-	// The user that is a moderator.
-	Node GetUserModsUserModsModConnectionEdgesModEdgeNodeUser `json:"node"`
-}
-
-// GetNode returns GetUserModsUserModsModConnectionEdgesModEdge.Node, and is useful for accessing the field via an interface.
-func (v *GetUserModsUserModsModConnectionEdgesModEdge) GetNode() GetUserModsUserModsModConnectionEdgesModEdgeNodeUser {
-	return v.Node
-}
-
-// GetUserModsUserModsModConnectionEdgesModEdgeNodeUser includes the requested fields of the GraphQL type User.
-// The GraphQL type's documentation follows.
-//
-// Twitch user.
-type GetUserModsUserModsModConnectionEdgesModEdgeNodeUser struct {
-	// The user's standard alphanumeric Twitch name.
-	Login string `json:"login"`
-}
-
-// GetLogin returns GetUserModsUserModsModConnectionEdgesModEdgeNodeUser.Login, and is useful for accessing the field via an interface.
-func (v *GetUserModsUserModsModConnectionEdgesModEdgeNodeUser) GetLogin() string { return v.Login }
-
 // An enumeration of broadcaster languages.
 type Language string
 
@@ -346,14 +282,6 @@ func (v *__GetStreamsInput) GetFirst() int { return v.First }
 // GetCursor returns __GetStreamsInput.Cursor, and is useful for accessing the field via an interface.
 func (v *__GetStreamsInput) GetCursor() string { return v.Cursor }
 
-// __GetUserModsInput is used internally by genqlient
-type __GetUserModsInput struct {
-	Login string `json:"login"`
-}
-
-// GetLogin returns __GetUserModsInput.Login, and is useful for accessing the field via an interface.
-func (v *__GetUserModsInput) GetLogin() string { return v.Login }
-
 // first must be between 1 and 30.
 // cursor is not included in the result.
 func GetStreams(
@@ -403,44 +331,6 @@ query GetStreams ($first: Int!, $cursor: Cursor!) {
 	var err error
 
 	var data GetStreamsResponse
-	resp := &graphql.Response{Data: &data}
-
-	err = client.MakeRequest(
-		ctx,
-		req,
-		resp,
-	)
-
-	return &data, err
-}
-
-func GetUserMods(
-	ctx context.Context,
-	client graphql.Client,
-	login string,
-) (*GetUserModsResponse, error) {
-	req := &graphql.Request{
-		OpName: "GetUserMods",
-		Query: `
-query GetUserMods ($login: String!) {
-	user(login: $login) {
-		mods {
-			edges {
-				node {
-					login
-				}
-			}
-		}
-	}
-}
-`,
-		Variables: &__GetUserModsInput{
-			Login: login,
-		},
-	}
-	var err error
-
-	var data GetUserModsResponse
 	resp := &graphql.Response{Data: &data}
 
 	err = client.MakeRequest(
