@@ -9,6 +9,8 @@ import (
 	"context"
 	"database/sql"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type AddManyStreamsParams struct {
@@ -78,17 +80,17 @@ ON
 `
 
 type GetEverythingRow struct {
-	ID                   string
+	ID                   uuid.UUID
 	StreamerID           string
 	StreamID             string
 	StartTime            time.Time
 	MaxViews             int64
 	LastUpdatedAt        time.Time
 	StreamerLoginAtStart string
-	ID_2                 sql.NullString
+	ID_2                 uuid.NullUUID
 	FetchedAt            sql.NullTime
 	GzippedBytes         []byte
-	StreamsID            sql.NullString
+	StreamsID            uuid.NullUUID
 }
 
 func (q *Queries) GetEverything(ctx context.Context) ([]GetEverythingRow, error) {
@@ -137,14 +139,14 @@ WHERE
 `
 
 type GetLatestStreamAndRecordingFromStreamIdRow struct {
-	ID                   string
+	ID                   uuid.UUID
 	LastUpdatedAt        time.Time
 	MaxViews             int64
 	StartTime            time.Time
 	StreamerID           string
 	StreamID             string
 	StreamerLoginAtStart string
-	ID_2                 sql.NullString
+	ID_2                 uuid.NullUUID
 	FetchedAt            sql.NullTime
 	GzippedBytes         []byte
 }
@@ -180,7 +182,7 @@ LIMIT 1
 `
 
 type GetLatestStreamFromStreamerIdRow struct {
-	ID                   string
+	ID                   uuid.UUID
 	LastUpdatedAt        time.Time
 	MaxViews             int64
 	StartTime            time.Time
@@ -217,7 +219,7 @@ LIMIT $1
 `
 
 type GetLatestStreamFromStreamerLoginRow struct {
-	ID                   string
+	ID                   uuid.UUID
 	LastUpdatedAt        time.Time
 	MaxViews             int64
 	StartTime            time.Time
@@ -259,7 +261,7 @@ type GetLatestStreamsFromStreamerIdParams struct {
 }
 
 type GetLatestStreamsFromStreamerIdRow struct {
-	ID                   string
+	ID                   uuid.UUID
 	LastUpdatedAt        time.Time
 	MaxViews             int64
 	StartTime            time.Time
@@ -306,7 +308,7 @@ WHERE
 `
 
 type GetStreamByStreamIdRow struct {
-	ID                   string
+	ID                   uuid.UUID
 	LastUpdatedAt        time.Time
 	MaxViews             int64
 	StartTime            time.Time
@@ -340,7 +342,7 @@ WHERE
 `
 
 type GetStreamForEachStreamIdRow struct {
-	ID                   string
+	ID                   uuid.UUID
 	LastUpdatedAt        time.Time
 	MaxViews             int64
 	StartTime            time.Time
@@ -411,7 +413,7 @@ ON CONFLICT
 DO
   UPDATE SET
     last_updated_at = EXCLUDED.last_updated_at,
-    max_views = GREATEST(max_views, EXCLUDED.max_views)
+    max_views = GREATEST(streams.max_views, EXCLUDED.max_views)
 `
 
 type UpsertManyStreamsParams struct {
@@ -445,7 +447,7 @@ ON CONFLICT
 DO
   UPDATE SET
     last_updated_at = EXCLUDED.last_updated_at,
-    max_views = GREATEST(max_views, EXCLUDED.max_views)
+    max_views = GREATEST(streams.max_views, EXCLUDED.max_views)
 `
 
 type UpsertStreamParams struct {

@@ -4,7 +4,7 @@ datasource db {
 }
 
 model streams {
-  id                      String      @id @default(uuid())
+  id                      String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   streamer_id             String
   stream_id               String      @unique
   start_time              DateTime
@@ -17,9 +17,9 @@ model streams {
 }
 
 model recordings {
-  id            String   @id @default(uuid())
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   fetched_at    DateTime
   gzipped_bytes Bytes
   stream        streams  @relation(fields: [streams_id], references: [id])
-  streams_id    String   @unique
+  streams_id    String   @unique @db.Uuid
 }

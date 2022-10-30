@@ -38,7 +38,7 @@ ON CONFLICT
 DO
   UPDATE SET
     last_updated_at = EXCLUDED.last_updated_at,
-    max_views = GREATEST(max_views, EXCLUDED.max_views);
+    max_views = GREATEST(streams.max_views, EXCLUDED.max_views);
 
 -- name: UpsertManyStreams :exec
 INSERT INTO
@@ -55,7 +55,7 @@ ON CONFLICT
 DO
   UPDATE SET
     last_updated_at = EXCLUDED.last_updated_at,
-    max_views = GREATEST(max_views, EXCLUDED.max_views);
+    max_views = GREATEST(streams.max_views, EXCLUDED.max_views);
 
 -- name: AddManyStreams :copyfrom
 INSERT INTO

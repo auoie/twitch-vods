@@ -1,6 +1,6 @@
 -- CreateTable
 CREATE TABLE "streams" (
-    "id" TEXT NOT NULL,
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "streamer_id" TEXT NOT NULL,
     "stream_id" TEXT NOT NULL,
     "start_time" TIMESTAMP(3) NOT NULL,
@@ -13,10 +13,10 @@ CREATE TABLE "streams" (
 
 -- CreateTable
 CREATE TABLE "recordings" (
-    "id" TEXT NOT NULL,
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "fetched_at" TIMESTAMP(3) NOT NULL,
     "gzipped_bytes" BYTEA NOT NULL,
-    "streams_id" TEXT NOT NULL,
+    "streams_id" UUID NOT NULL,
 
     CONSTRAINT "recordings_pkey" PRIMARY KEY ("id")
 );

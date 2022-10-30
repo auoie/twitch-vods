@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"time"
@@ -53,7 +54,7 @@ func main() {
 	queries := sqlvods.New(conn)
 	err = queries.UpsertManyStreams(context.Background(), getUpsertManyStreamsParams(streams0))
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(fmt.Sprint("failed to upsert: ", err))
 	}
 	err = queries.DeleteRecordings(context.Background())
 	if err != nil {

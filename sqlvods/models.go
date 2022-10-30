@@ -6,17 +6,19 @@ package sqlvods
 
 import (
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type Recording struct {
-	ID           string
+	ID           uuid.UUID
 	FetchedAt    time.Time
 	GzippedBytes []byte
-	StreamsID    string
+	StreamsID    uuid.UUID
 }
 
 type Stream struct {
-	ID                   string
+	ID                   uuid.UUID
 	StreamerID           string
 	StreamID             string
 	StartTime            time.Time
