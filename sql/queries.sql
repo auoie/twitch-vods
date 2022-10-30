@@ -40,6 +40,23 @@ DO
     last_updated_at = EXCLUDED.last_updated_at,
     max_views = GREATEST(max_views, EXCLUDED.max_views);
 
+-- name: UpsertManyStreams :exec
+INSERT INTO
+  streams (last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start)
+SELECT
+  unnest(@last_updated_at_arr::TIMESTAMP(3)[]) AS last_updated_at,
+  unnest(@max_views_arr::BIGINT[]) AS max_views,
+  unnest(@start_time_arr::TIMESTAMP(3)[]) AS start_time,
+  unnest(@streamer_id_arr::TEXT[]) AS streamer_id,
+  unnest(@stream_id_arr::TEXT[]) AS stream_id,
+  unnest(@streamer_login_at_start_arr::TEXT[]) AS streamer_login_at_start
+ON CONFLICT
+  (stream_id)
+DO
+  UPDATE SET
+    last_updated_at = EXCLUDED.last_updated_at,
+    max_views = GREATEST(max_views, EXCLUDED.max_views);
+
 -- name: AddManyStreams :copyfrom
 INSERT INTO
   streams (last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start)
@@ -100,3 +117,9 @@ LEFT JOIN
   recordings r
 ON
   s.id = r.streams_id;
+
+-- name: DeleteRecordings :exec
+DELETE FROM recordings;
+
+-- name: DeleteStreams :exec
+DELETE FROM streams;

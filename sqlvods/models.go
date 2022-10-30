@@ -20,7 +20,7 @@ type Stream struct {
 	StreamerID           string
 	StreamID             string
 	StartTime            time.Time
-	MaxViews             int32
+	MaxViews             int64
 	LastUpdatedAt        time.Time
 	StreamerLoginAtStart string
 }

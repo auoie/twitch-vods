@@ -4,7 +4,7 @@ CREATE TABLE "streams" (
     "streamer_id" TEXT NOT NULL,
     "stream_id" TEXT NOT NULL,
     "start_time" TIMESTAMP(3) NOT NULL,
-    "max_views" INTEGER NOT NULL,
+    "max_views" BIGINT NOT NULL,
     "last_updated_at" TIMESTAMP(3) NOT NULL,
     "streamer_login_at_start" TEXT NOT NULL,
 
@@ -25,7 +25,7 @@ CREATE TABLE "recordings" (
 CREATE UNIQUE INDEX "streams_stream_id_key" ON "streams"("stream_id");
 
 -- CreateIndex
-CREATE INDEX "streams_streamer_id_start_time_idx" ON "streams"("streamer_id", "start_time");
+CREATE INDEX "streams_streamer_id_start_time_idx" ON "streams"("streamer_id", "start_time" DESC);
 
 -- CreateIndex
 CREATE UNIQUE INDEX "recordings_streams_id_key" ON "recordings"("streams_id");

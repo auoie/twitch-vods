@@ -7,8 +7,8 @@ require (
 	github.com/Khan/genqlient v0.5.0
 	github.com/auoie/firstNonErr v1.0.0
 	github.com/grafov/m3u8 v0.11.1
-	github.com/jackc/pgconn v1.12.1
-	github.com/jackc/pgx/v4 v4.16.1
+	github.com/jackc/pgconn v1.13.0
+	github.com/jackc/pgx/v4 v4.17.2
 	github.com/kyleconroy/sqlc v1.15.0
 	github.com/monitor1379/yagods v1.13.0
 	github.com/urfave/cli/v2 v2.19.2
@@ -29,9 +29,10 @@ require (
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
 	github.com/jackc/pgio v1.0.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
-	github.com/jackc/pgproto3/v2 v2.3.0 // indirect
+	github.com/jackc/pgproto3/v2 v2.3.1 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20200714003250-2b9c44734f2b // indirect
-	github.com/jackc/pgtype v1.11.0 // indirect
+	github.com/jackc/pgtype v1.12.0 // indirect
+	github.com/jackc/puddle v1.3.0 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/kr/pretty v0.3.0 // indirect
 	github.com/pganalyze/pg_query_go/v2 v2.1.2 // indirect

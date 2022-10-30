@@ -8,7 +8,7 @@ model streams {
   streamer_id             String
   stream_id               String      @unique
   start_time              DateTime
-  max_views               Int
+  max_views               BigInt
   last_updated_at         DateTime
   streamer_login_at_start String
   recordings              recordings?

@@ -13,7 +13,7 @@ import (
 
 type AddManyStreamsParams struct {
 	LastUpdatedAt        time.Time
-	MaxViews             int32
+	MaxViews             int64
 	StartTime            time.Time
 	StreamerID           string
 	StreamID             string
@@ -29,7 +29,7 @@ VALUES
 
 type AddStreamParams struct {
 	LastUpdatedAt        time.Time
-	MaxViews             int32
+	MaxViews             int64
 	StartTime            time.Time
 	StreamerID           string
 	StreamID             string
@@ -45,6 +45,24 @@ func (q *Queries) AddStream(ctx context.Context, arg AddStreamParams) error {
 		arg.StreamID,
 		arg.StreamerLoginAtStart,
 	)
+	return err
+}
+
+const deleteRecordings = `-- name: DeleteRecordings :exec
+DELETE FROM recordings
+`
+
+func (q *Queries) DeleteRecordings(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, deleteRecordings)
+	return err
+}
+
+const deleteStreams = `-- name: DeleteStreams :exec
+DELETE FROM streams
+`
+
+func (q *Queries) DeleteStreams(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, deleteStreams)
 	return err
 }
 
@@ -64,7 +82,7 @@ type GetEverythingRow struct {
 	StreamerID           string
 	StreamID             string
 	StartTime            time.Time
-	MaxViews             int32
+	MaxViews             int64
 	LastUpdatedAt        time.Time
 	StreamerLoginAtStart string
 	ID_2                 sql.NullString
@@ -121,7 +139,7 @@ WHERE
 type GetLatestStreamAndRecordingFromStreamIdRow struct {
 	ID                   string
 	LastUpdatedAt        time.Time
-	MaxViews             int32
+	MaxViews             int64
 	StartTime            time.Time
 	StreamerID           string
 	StreamID             string
@@ -164,7 +182,7 @@ LIMIT 1
 type GetLatestStreamFromStreamerIdRow struct {
 	ID                   string
 	LastUpdatedAt        time.Time
-	MaxViews             int32
+	MaxViews             int64
 	StartTime            time.Time
 	StreamerID           string
 	StreamID             string
@@ -201,7 +219,7 @@ LIMIT $1
 type GetLatestStreamFromStreamerLoginRow struct {
 	ID                   string
 	LastUpdatedAt        time.Time
-	MaxViews             int32
+	MaxViews             int64
 	StartTime            time.Time
 	StreamerID           string
 	StreamID             string
@@ -243,7 +261,7 @@ type GetLatestStreamsFromStreamerIdParams struct {
 type GetLatestStreamsFromStreamerIdRow struct {
 	ID                   string
 	LastUpdatedAt        time.Time
-	MaxViews             int32
+	MaxViews             int64
 	StartTime            time.Time
 	StreamerID           string
 	StreamID             string
@@ -290,7 +308,7 @@ WHERE
 type GetStreamByStreamIdRow struct {
 	ID                   string
 	LastUpdatedAt        time.Time
-	MaxViews             int32
+	MaxViews             int64
 	StartTime            time.Time
 	StreamerID           string
 	StreamID             string
@@ -324,7 +342,7 @@ WHERE
 type GetStreamForEachStreamIdRow struct {
 	ID                   string
 	LastUpdatedAt        time.Time
-	MaxViews             int32
+	MaxViews             int64
 	StartTime            time.Time
 	StreamerID           string
 	StreamID             string
@@ -370,11 +388,50 @@ WHERE
 
 type UpdateStreamParams struct {
 	LastUpdatedAt time.Time
-	MaxViews      int32
+	MaxViews      int64
 }
 
 func (q *Queries) UpdateStream(ctx context.Context, arg UpdateStreamParams) error {
 	_, err := q.db.Exec(ctx, updateStream, arg.LastUpdatedAt, arg.MaxViews)
+	return err
+}
+
+const upsertManyStreams = `-- name: UpsertManyStreams :exec
+INSERT INTO
+  streams (last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start)
+SELECT
+  unnest($1::TIMESTAMP(3)[]) AS last_updated_at,
+  unnest($2::BIGINT[]) AS max_views,
+  unnest($3::TIMESTAMP(3)[]) AS start_time,
+  unnest($4::TEXT[]) AS streamer_id,
+  unnest($5::TEXT[]) AS stream_id,
+  unnest($6::TEXT[]) AS streamer_login_at_start
+ON CONFLICT
+  (stream_id)
+DO
+  UPDATE SET
+    last_updated_at = EXCLUDED.last_updated_at,
+    max_views = GREATEST(max_views, EXCLUDED.max_views)
+`
+
+type UpsertManyStreamsParams struct {
+	LastUpdatedAtArr        []time.Time
+	MaxViewsArr             []int64
+	StartTimeArr            []time.Time
+	StreamerIDArr           []string
+	StreamIDArr             []string
+	StreamerLoginAtStartArr []string
+}
+
+func (q *Queries) UpsertManyStreams(ctx context.Context, arg UpsertManyStreamsParams) error {
+	_, err := q.db.Exec(ctx, upsertManyStreams,
+		arg.LastUpdatedAtArr,
+		arg.MaxViewsArr,
+		arg.StartTimeArr,
+		arg.StreamerIDArr,
+		arg.StreamIDArr,
+		arg.StreamerLoginAtStartArr,
+	)
 	return err
 }
 
@@ -393,7 +450,7 @@ DO
 
 type UpsertStreamParams struct {
 	LastUpdatedAt        time.Time
-	MaxViews             int32
+	MaxViews             int64
 	StartTime            time.Time
 	StreamerID           string
 	StreamID             string
