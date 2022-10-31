@@ -359,11 +359,12 @@ func ScrapeTwitchLiveVodsWithGqlApi(params ScrapeTwitchLiveVodsWithGqlApiParams)
 			return err
 		}
 		go hlsWorkerFetchCompressSend(hlsWorkerFetchCompressSendParams{
-			ctx:             ctx,
-			oldVodJobsCh:    oldVodJobsCh,
-			hlsFetcherDelay: params.HlsFetcherDelay,
-			compressor:      &compressor,
-			resultsCh:       resultsCh,
+			ctx:                  ctx,
+			oldVodJobsCh:         oldVodJobsCh,
+			hlsFetcherDelay:      params.HlsFetcherDelay,
+			compressor:           &compressor,
+			resultsCh:            resultsCh,
+			m3u8RequestTimeLimit: params.RequestTimeLimit,
 		})
 	}
 	go func() {
