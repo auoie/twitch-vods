@@ -75,7 +75,7 @@ func fetchTwitchGqlForever(
 	resetCursorTimeout := time.Now().Add(cursorResetThreshold)
 	debugIndex := -1
 	resetCursor := func() {
-		log.Println(fmt.Sprint("Reseting cursor on debug index: ", debugIndex))
+		log.Println(fmt.Sprint("Resetting cursor on debug index: ", debugIndex))
 		debugIndex = -1
 		cursor = ""
 		resetCursorTimeout = time.Now().Add(cursorResetThreshold)
