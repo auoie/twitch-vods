@@ -371,14 +371,16 @@ func (q *Queries) GetStreamForEachStreamId(ctx context.Context, dollar_1 []strin
 }
 
 const getStreamForEachStreamIdUnnest = `-- name: GetStreamForEachStreamIdUnnest :many
+WITH
+  ids AS (SELECT unnest($1::TEXT[]) AS stream_id)
 SELECT
   id, last_updated_at, max_views, start_time, streamer_id, streams.stream_id, streamer_login_at_start
 FROM 
+  ids
+LEFT JOIN
   streams
-RIGHT JOIN
-  (SELECT unnest($1::TEXT[]) AS stream_id) AS ids
 ON
-  streams.stream_id = ids.stream_id
+  ids.stream_id = streams.stream_id
 `
 
 type GetStreamForEachStreamIdUnnestRow struct {
