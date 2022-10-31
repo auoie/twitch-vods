@@ -195,3 +195,6 @@ If the database fails, I get an error.
 If the `ID` is not found I get an error.
 It's not possible to distinguish these two cases.
 Instead, I should just use `:many` and then check the size.
+
+The most type safe approach is probably batching with `:batchmany`, while also checking that the length
+of each returned value is 1.

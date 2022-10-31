@@ -150,16 +150,17 @@ func main() {
 	log.Print()
 
 	results := queries.GetStreamForEachStreamIdBatched(context.Background(), []string{"hmm", "streamid0", "doesn't exist"})
-	results.QueryRow(func(i int, gsfesibr sqlvods.GetStreamForEachStreamIdBatchedRow, err error) {
+	results.Query(func(i int, gsfesibr []sqlvods.GetStreamForEachStreamIdBatchedRow, err error) {
 		if err != nil {
 			log.Println(err)
 		} else {
 			log.Println(gsfesibr)
+			log.Println(gsfesibr == nil)
 		}
 	})
 	log.Print()
 
-	streamsunnest, err := queries.GetStreamForEachStreamIdUnnest(context.Background(), []string{"hmm", "streamid0", "doesn't exist"})
+	streamsunnest, err := queries.GetStreamForEachStreamIdUnnest(context.Background(), []string{"hmm", "streamid0", "doesn't exist", "streamid0", "streamid1"})
 	logFatalOnError(err)
 	log.Println(streamsunnest)
 	log.Println(len(streamsunnest))

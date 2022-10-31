@@ -14,13 +14,14 @@ import (
 	"github.com/jackc/pgx/v4"
 )
 
-const getStreamForEachStreamIdBatched = `-- name: GetStreamForEachStreamIdBatched :batchone
+const getStreamForEachStreamIdBatched = `-- name: GetStreamForEachStreamIdBatched :batchmany
 SELECT
   id, last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start
 FROM 
   streams
 WHERE
   stream_id = $1
+LIMIT 1
 `
 
 type GetStreamForEachStreamIdBatchedBatchResults struct {
@@ -51,28 +52,41 @@ func (q *Queries) GetStreamForEachStreamIdBatched(ctx context.Context, streamID 
 	return &GetStreamForEachStreamIdBatchedBatchResults{br, len(streamID), false}
 }
 
-func (b *GetStreamForEachStreamIdBatchedBatchResults) QueryRow(f func(int, GetStreamForEachStreamIdBatchedRow, error)) {
+func (b *GetStreamForEachStreamIdBatchedBatchResults) Query(f func(int, []GetStreamForEachStreamIdBatchedRow, error)) {
 	defer b.br.Close()
 	for t := 0; t < b.tot; t++ {
-		var i GetStreamForEachStreamIdBatchedRow
+		var items []GetStreamForEachStreamIdBatchedRow
 		if b.closed {
 			if f != nil {
-				f(t, i, errors.New("batch already closed"))
+				f(t, items, errors.New("batch already closed"))
 			}
 			continue
 		}
-		row := b.br.QueryRow()
-		err := row.Scan(
-			&i.ID,
-			&i.LastUpdatedAt,
-			&i.MaxViews,
-			&i.StartTime,
-			&i.StreamerID,
-			&i.StreamID,
-			&i.StreamerLoginAtStart,
-		)
+		err := func() error {
+			rows, err := b.br.Query()
+			defer rows.Close()
+			if err != nil {
+				return err
+			}
+			for rows.Next() {
+				var i GetStreamForEachStreamIdBatchedRow
+				if err := rows.Scan(
+					&i.ID,
+					&i.LastUpdatedAt,
+					&i.MaxViews,
+					&i.StartTime,
+					&i.StreamerID,
+					&i.StreamID,
+					&i.StreamerLoginAtStart,
+				); err != nil {
+					return err
+				}
+				items = append(items, i)
+			}
+			return rows.Err()
+		}()
 		if f != nil {
-			f(t, i, err)
+			f(t, items, err)
 		}
 	}
 }
