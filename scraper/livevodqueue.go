@@ -24,15 +24,15 @@ type liveVodKey struct {
 	streamId    string
 }
 
-// streamerId acts as a primary key
-// streamId also acts as a primary key
 type liveVodsPriorityQueue struct {
+	// streamerId acts as a primary key
+	// streamId also acts as a primary key
 	streamerIdToVod  map[string]*LiveVod // at most one VOD per streamer id
 	streamIdToVod    map[string]*LiveVod // at most one VOD per stream id
 	lastUpdatedToVod *treemap.Map[*liveVodKey, *LiveVod]
 }
 
-// This makes it easy to fetch the VOD with the oldest LastUpdated time
+// This makes it easy to fetch the VOD with the oldest LastUpdated time.
 func CreateNewLiveVodsPriorityQueue() *liveVodsPriorityQueue {
 	return &liveVodsPriorityQueue{
 		streamerIdToVod: map[string]*LiveVod{},
@@ -65,9 +65,9 @@ func (vods *liveVodsPriorityQueue) RemoveVod(vod *LiveVod) {
 	delete(vods.streamerIdToVod, vod.StreamerId)
 }
 
-// Parameters are the information for the VOD
-// Returns nil error iff new VOD evicts an older VOD
-// In the above case, the returned VOD will be the evicted VOD
+// Parameters are the information for the VOD.
+// Returns nil error iff new VOD evicts an older VOD.
+// In the above case, the returned VOD will be the evicted VOD.
 // This code scares me. It's probably buggy.
 func (vods *liveVodsPriorityQueue) UpsertVod(
 	curTime time.Time,
