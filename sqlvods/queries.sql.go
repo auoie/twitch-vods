@@ -50,15 +50,6 @@ func (q *Queries) AddStream(ctx context.Context, arg AddStreamParams) error {
 	return err
 }
 
-const deleteRecordings = `-- name: DeleteRecordings :exec
-DELETE FROM recordings
-`
-
-func (q *Queries) DeleteRecordings(ctx context.Context) error {
-	_, err := q.db.Exec(ctx, deleteRecordings)
-	return err
-}
-
 const deleteStreams = `-- name: DeleteStreams :exec
 DELETE FROM streams
 `

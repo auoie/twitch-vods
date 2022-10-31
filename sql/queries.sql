@@ -157,8 +157,5 @@ LEFT JOIN
 ON
   s.id = r.streams_id;
 
--- name: DeleteRecordings :exec
-DELETE FROM recordings;
-
 -- name: DeleteStreams :exec
 DELETE FROM streams;

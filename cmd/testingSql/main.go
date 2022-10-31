@@ -170,6 +170,5 @@ func main() {
 	}
 	log.Print()
 
-	logFatalOnError(queries.DeleteRecordings(context.Background()))
 	logFatalOnError(queries.DeleteStreams(context.Background()))
 }
