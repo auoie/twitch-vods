@@ -89,6 +89,9 @@ func main() {
 	helloStreams, err := queries.GetStreamsByStreamId(context.Background(), "hello")
 	logFatalOnError(err)
 	prettyPrint(len(helloStreams))
+	streams, err := queries.GetStreamForEachStreamId(context.Background(), []string{"hmm", "streamid0", "doesn't exist"})
+	logFatalOnError(err)
+	log.Println(streams, len(streams))
 	logFatalOnError(queries.DeleteRecordings(context.Background()))
 	logFatalOnError(queries.DeleteStreams(context.Background()))
 }

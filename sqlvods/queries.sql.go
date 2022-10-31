@@ -338,7 +338,7 @@ SELECT
 FROM 
   streams
 WHERE
-  stream_id = ANY($1::string[])
+  stream_id = ANY($1::TEXT[])
 `
 
 type GetStreamForEachStreamIdRow struct {
