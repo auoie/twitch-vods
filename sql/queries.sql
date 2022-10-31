@@ -116,6 +116,18 @@ ON
 WHERE
   s.stream_id = $1;
 
+-- name: UpsertRecording :exec
+INSERT INTO
+  recordings (fetched_at, gzipped_bytes, streams_id)
+VALUES
+  ($1, $2, $3)
+ON CONFLICT
+  (streams_id)
+DO
+  UPDATE SET
+    fetched_at = EXCLUDED.fetched_at,
+    gzipped_bytes = EXCLUDED.gzipped_bytes;
+
 -- name: GetEverything :many
 SELECT
   *

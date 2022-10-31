@@ -484,6 +484,30 @@ func (q *Queries) UpsertManyStreams(ctx context.Context, arg UpsertManyStreamsPa
 	return err
 }
 
+const upsertRecording = `-- name: UpsertRecording :exec
+INSERT INTO
+  recordings (fetched_at, gzipped_bytes, streams_id)
+VALUES
+  ($1, $2, $3)
+ON CONFLICT
+  (streams_id)
+DO
+  UPDATE SET
+    fetched_at = EXCLUDED.fetched_at,
+    gzipped_bytes = EXCLUDED.gzipped_bytes
+`
+
+type UpsertRecordingParams struct {
+	FetchedAt    time.Time
+	GzippedBytes []byte
+	StreamsID    uuid.UUID
+}
+
+func (q *Queries) UpsertRecording(ctx context.Context, arg UpsertRecordingParams) error {
+	_, err := q.db.Exec(ctx, upsertRecording, arg.FetchedAt, arg.GzippedBytes, arg.StreamsID)
+	return err
+}
+
 const upsertStream = `-- name: UpsertStream :exec
 INSERT INTO
   streams (last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start)

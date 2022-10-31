@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -10,6 +9,7 @@ import (
 
 	"github.com/auoie/goVods/scraper"
 	"github.com/auoie/goVods/sqlvods"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v4/pgxpool"
 )
 
@@ -24,6 +24,17 @@ func createLiveVod(id int) scraper.LiveVod {
 	}
 }
 
+func createLiveVodWithViews(id int, views int) scraper.LiveVod {
+	return scraper.LiveVod{
+		StreamerId:           fmt.Sprint("streamerid", id),
+		StreamId:             fmt.Sprint("streamid", id),
+		StartTime:            time.Now().Add(-60 * time.Minute),
+		StreamerLoginAtStart: fmt.Sprint(id),
+		MaxViews:             views,
+		LastUpdated:          time.Now().Add(-1 * time.Minute),
+	}
+}
+
 var streams0 = []scraper.LiveVod{
 	createLiveVod(0),
 	createLiveVod(1),
@@ -32,8 +43,20 @@ var streams0 = []scraper.LiveVod{
 
 var streams1 = []scraper.LiveVod{
 	createLiveVod(0),
-	createLiveVod(1),
+	createLiveVodWithViews(1, 50),
 	createLiveVod(2),
+}
+
+var streams2 = []scraper.LiveVod{
+	createLiveVod(0),
+	createLiveVodWithViews(1, 150),
+	createLiveVod(2),
+}
+
+var streams3 = []scraper.LiveVod{
+	createLiveVod(0),
+	createLiveVod(1),
+	createLiveVod(3),
 }
 
 func getUpsertManyStreamsParams(streams []scraper.LiveVod) sqlvods.UpsertManyStreamsParams {
@@ -47,14 +70,6 @@ func getUpsertManyStreamsParams(streams []scraper.LiveVod) sqlvods.UpsertManyStr
 		result.StreamerLoginAtStartArr = append(result.StreamerLoginAtStartArr, stream.StreamerLoginAtStart)
 	}
 	return result
-}
-
-func prettyPrint(value any) {
-	bytes, err := json.MarshalIndent(value, "", "  ")
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println(string(bytes))
 }
 
 func logFatalOnError(err error) {
@@ -75,23 +90,60 @@ func main() {
 	defer conn.Close()
 	logFatalOnError(conn.Ping(context.Background()))
 	queries := sqlvods.New(conn)
+
 	logFatalOnError(queries.UpsertManyStreams(context.Background(), getUpsertManyStreamsParams(streams0)))
 	everything, err := queries.GetEverything(context.Background())
 	logFatalOnError(err)
-	prettyPrint(everything)
+	log.Println(everything)
+	log.Println(len(everything))
+	log.Print()
+
 	logFatalOnError(queries.UpsertManyStreams(context.Background(), getUpsertManyStreamsParams(streams1)))
 	everything, err = queries.GetEverything(context.Background())
 	logFatalOnError(err)
-	prettyPrint(everything)
+	log.Println(everything)
+	log.Println(len(everything))
+	log.Print()
+
+	logFatalOnError(queries.UpsertManyStreams(context.Background(), getUpsertManyStreamsParams(streams2)))
+	everything, err = queries.GetEverything(context.Background())
+	logFatalOnError(err)
+	log.Println(everything)
+	log.Println(len(everything))
+	log.Print()
+
+	logFatalOnError(queries.UpsertManyStreams(context.Background(), getUpsertManyStreamsParams(streams3)))
+	everything, err = queries.GetEverything(context.Background())
+	logFatalOnError(err)
+	log.Println(everything)
+	log.Println(len(everything))
+	log.Print()
+
 	helloStream, err := queries.GetStreamByStreamId(context.Background(), "hello")
 	log.Println(err)
-	prettyPrint(helloStream)
+	log.Println(helloStream)
+
 	helloStreams, err := queries.GetStreamsByStreamId(context.Background(), "hello")
 	logFatalOnError(err)
-	prettyPrint(len(helloStreams))
+	log.Println(len(helloStreams))
+
 	streams, err := queries.GetStreamForEachStreamId(context.Background(), []string{"hmm", "streamid0", "doesn't exist"})
 	logFatalOnError(err)
-	log.Println(streams, len(streams))
+	log.Println(streams)
+	log.Println(len(streams))
+	log.Print()
+
+	err = queries.UpsertRecording(context.Background(), sqlvods.UpsertRecordingParams{FetchedAt: time.Now(), GzippedBytes: []byte{'a', 'b', 'c'}, StreamsID: uuid.UUID{}})
+	log.Println(err)
+	log.Print()
+
+	logFatalOnError(queries.UpsertRecording(context.Background(), sqlvods.UpsertRecordingParams{FetchedAt: time.Now(), GzippedBytes: []byte{'a', 'b', 'c'}, StreamsID: streams[0].ID}))
+	everything, err = queries.GetEverything(context.Background())
+	logFatalOnError(err)
+	log.Println(everything)
+	log.Println(len(everything))
+	log.Print()
+
 	logFatalOnError(queries.DeleteRecordings(context.Background()))
 	logFatalOnError(queries.DeleteStreams(context.Background()))
 }
