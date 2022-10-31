@@ -161,3 +161,7 @@ sql/queries.sql:50:1: :copyfrom requires an INSERT INTO statement
 sql/queries.sql:58:1: :copyfrom is not compatible with ON CONFLICT
 exit status 1
 ```
+
+The batching approach between `pggen` and `sqlc` are different.
+I prefer the `pggen` approach.
+It allows you to combine different types of queries in a single batch.
