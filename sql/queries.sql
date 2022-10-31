@@ -20,7 +20,15 @@ SELECT
 FROM 
   streams
 WHERE
-  stream_id = ANY($1::TEXT[]); 
+  stream_id = ANY($1::TEXT[]);
+
+-- name: GetStreamForEachStreamIdBatched :batchmany
+SELECT
+  id, last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start
+FROM 
+  streams
+WHERE
+  stream_id = $1; 
 
 -- name: AddStream :exec
 INSERT INTO

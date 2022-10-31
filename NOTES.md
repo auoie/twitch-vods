@@ -165,3 +165,21 @@ exit status 1
 The batching approach between `pggen` and `sqlc` are different.
 I prefer the `pggen` approach.
 It allows you to combine different types of queries in a single batch.
+
+To generate the SQL code, it should be sufficient to run
+
+```bash
+sqlc generate
+```
+
+This is buggy for batches.
+In particular, it doesn't get the correct imports of `time` and `uuid`.
+I'm using version 1.15.
+Instead, use
+
+```bash
+go install github.com/kyleconroy/sqlc/cmd/sqlc@main
+~/go/bin/sqlc generate
+```
+
+Now it should work.
