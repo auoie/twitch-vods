@@ -379,6 +379,55 @@ func (q *Queries) GetStreamForEachStreamId(ctx context.Context, dollar_1 []strin
 	return items, nil
 }
 
+const getStreamForEachStreamIdUnnest = `-- name: GetStreamForEachStreamIdUnnest :many
+SELECT
+  id, last_updated_at, max_views, start_time, streamer_id, streams.stream_id, streamer_login_at_start
+FROM 
+  streams
+RIGHT JOIN
+  (SELECT unnest($1::TEXT[]) AS stream_id) AS ids
+ON
+  streams.stream_id = ids.stream_id
+`
+
+type GetStreamForEachStreamIdUnnestRow struct {
+	ID                   uuid.NullUUID
+	LastUpdatedAt        sql.NullTime
+	MaxViews             sql.NullInt64
+	StartTime            sql.NullTime
+	StreamerID           sql.NullString
+	StreamID             sql.NullString
+	StreamerLoginAtStart sql.NullString
+}
+
+func (q *Queries) GetStreamForEachStreamIdUnnest(ctx context.Context, streamIDArr []string) ([]GetStreamForEachStreamIdUnnestRow, error) {
+	rows, err := q.db.Query(ctx, getStreamForEachStreamIdUnnest, streamIDArr)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetStreamForEachStreamIdUnnestRow
+	for rows.Next() {
+		var i GetStreamForEachStreamIdUnnestRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.LastUpdatedAt,
+			&i.MaxViews,
+			&i.StartTime,
+			&i.StreamerID,
+			&i.StreamID,
+			&i.StreamerLoginAtStart,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getStreamsByStreamId = `-- name: GetStreamsByStreamId :many
 SELECT 
   id, last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start

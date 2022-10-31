@@ -24,6 +24,11 @@ func createLiveVod(id int) scraper.LiveVod {
 	}
 }
 
+func isNonZero[T comparable](input T) bool {
+	var zeroValue T
+	return input != zeroValue
+}
+
 func createLiveVodWithViews(id int, views int) scraper.LiveVod {
 	return scraper.LiveVod{
 		StreamerId:           fmt.Sprint("streamerid", id),
@@ -142,6 +147,26 @@ func main() {
 	logFatalOnError(err)
 	log.Println(everything)
 	log.Println(len(everything))
+	log.Print()
+
+	results := queries.GetStreamForEachStreamIdBatched(context.Background(), []string{"hmm", "streamid0", "doesn't exist"})
+	results.QueryRow(func(i int, gsfesibr sqlvods.GetStreamForEachStreamIdBatchedRow, err error) {
+		if err != nil {
+			log.Println(err)
+		} else {
+			log.Println(gsfesibr)
+		}
+	})
+	log.Print()
+
+	streamsunnest, err := queries.GetStreamForEachStreamIdUnnest(context.Background(), []string{"hmm", "streamid0", "doesn't exist"})
+	logFatalOnError(err)
+	log.Println(streamsunnest)
+	log.Println(len(streamsunnest))
+	for _, elem := range streamsunnest {
+		log.Println(isNonZero(elem))
+		log.Println(elem.ID.Valid)
+	}
 	log.Print()
 
 	logFatalOnError(queries.DeleteRecordings(context.Background()))

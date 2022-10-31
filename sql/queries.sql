@@ -22,13 +22,23 @@ FROM
 WHERE
   stream_id = ANY($1::TEXT[]);
 
--- name: GetStreamForEachStreamIdBatched :batchmany
+-- name: GetStreamForEachStreamIdBatched :batchone
 SELECT
   id, last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start
 FROM 
   streams
 WHERE
-  stream_id = $1; 
+  stream_id = $1;
+
+-- name: GetStreamForEachStreamIdUnnest :many
+SELECT
+  id, last_updated_at, max_views, start_time, streamer_id, streams.stream_id, streamer_login_at_start
+FROM 
+  streams
+RIGHT JOIN
+  (SELECT unnest(@stream_id_arr::TEXT[]) AS stream_id) AS ids
+ON
+  streams.stream_id = ids.stream_id; 
 
 -- name: AddStream :exec
 INSERT INTO

@@ -183,3 +183,15 @@ go install github.com/kyleconroy/sqlc/cmd/sqlc@main
 ```
 
 Now it should work.
+
+I prefer the approach of using batching to using `ANY` for selecting my rows in one query
+because it returns a nil pointer in the case that a row returns nothing.
+When using `ANY`, it only returns the rows that were found, making it harder to figure out which SELECTs were successful.
+Alternatively, I could go with the approach of creating an inner table by unnesting an array if input IDs and making a `RIGHT JOIN`
+on that table of IDs with the original table.
+
+I don't like how `:one` returns an error if the element not found.
+If the database fails, I get an error.
+If the `ID` is not found I get an error.
+It's not possible to distinguish these two cases.
+Instead, I should just use `:many` and then check the size.
