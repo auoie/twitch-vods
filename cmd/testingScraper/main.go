@@ -9,15 +9,17 @@ import (
 
 func main() {
 	scraper.ScrapeTwitchLiveVodsWithGqlApi(
-		context.Background(),
-		333*time.Millisecond,
-		5*time.Second,
-		10*time.Minute,
-		20000,
-		5,
-		time.Second,
-		5*time.Minute,
-		1,
-		5,
+		scraper.ScrapeTwitchLiveVodsWithGqlApiParams{
+			Ctx:                        context.Background(),
+			TwitchGqlFetcherDelay:      333 * time.Millisecond,
+			TwitchGqlRequestTimeLimit:  5 * time.Second,
+			OldVodEvictionThreshold:    10 * time.Minute,
+			MaxOldVodsQueueSize:        20000,
+			NumHlsFetchers:             5,
+			HlsFetcherDelay:            time.Second,
+			CursorResetThreshold:       5 * time.Minute,
+			LibdeflateCompressionLevel: 1,
+			MinViewerCountToObserve:    5,
+		},
 	)
 }
