@@ -12,7 +12,7 @@ func main() {
 		scraper.ScrapeTwitchLiveVodsWithGqlApiParams{
 			Ctx:                        context.Background(),
 			TwitchGqlFetcherDelay:      333 * time.Millisecond,
-			TwitchGqlRequestTimeLimit:  5 * time.Second,
+			RequestTimeLimit:           5 * time.Second,
 			OldVodEvictionThreshold:    10 * time.Minute,
 			MaxOldVodsQueueSize:        20000,
 			NumHlsFetchers:             5,

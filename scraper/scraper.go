@@ -228,14 +228,6 @@ func processOldVodJobs(params processOldVodJobsParams) {
 	}
 }
 
-type hlsWorkerFetchCompressSendParams struct {
-	ctx             context.Context
-	oldVodJobsCh    chan *LiveVod
-	hlsFetcherDelay time.Duration
-	compressor      *libdeflate.Compressor
-	resultsCh       chan *VodResult
-}
-
 // Find the .m3u8 for a video and return the compressed bytes.
 func getVodCompressedBytes(ctx context.Context, videoData *vods.VideoData, compressor *libdeflate.Compressor) ([]byte, error) {
 	dwp, err := vods.GetFirstValidDwp(ctx, videoData.GetDomainWithPathsList(vods.DOMAINS, 1))
@@ -262,6 +254,15 @@ func getVodCompressedBytes(ctx context.Context, videoData *vods.VideoData, compr
 	return compressedBytes, nil
 }
 
+type hlsWorkerFetchCompressSendParams struct {
+	ctx                  context.Context
+	oldVodJobsCh         chan *LiveVod
+	hlsFetcherDelay      time.Duration
+	compressor           *libdeflate.Compressor
+	resultsCh            chan *VodResult
+	m3u8RequestTimeLimit time.Duration
+}
+
 func hlsWorkerFetchCompressSend(params hlsWorkerFetchCompressSendParams) {
 	hlsFetcherTicker := time.NewTicker(params.hlsFetcherDelay)
 	defer params.compressor.Close()
@@ -283,7 +284,9 @@ func hlsWorkerFetchCompressSend(params hlsWorkerFetchCompressSendParams) {
 		if err != nil {
 			return
 		}
-		bytes, err := getVodCompressedBytes(params.ctx, oldVod.GetVideoData(), params.compressor)
+		requestCtx, cancel := context.WithTimeout(params.ctx, params.m3u8RequestTimeLimit)
+		bytes, err := getVodCompressedBytes(requestCtx, oldVod.GetVideoData(), params.compressor)
+		cancel()
 		var result *VodResult
 		if err != nil {
 			result = &VodResult{Vod: oldVod, HlsBytes: nil, HlsBytesFound: false}
@@ -303,8 +306,8 @@ type ScrapeTwitchLiveVodsWithGqlApiParams struct {
 	Ctx context.Context
 	// In any interval of this length, the api will be called at most twice and on average once.
 	TwitchGqlFetcherDelay time.Duration
-	// If this is exceeded, the for loop continues. TODO: I should fix this.
-	TwitchGqlRequestTimeLimit time.Duration
+	// Time limit for .m3u8 and Twitch GQL requests. If this is exceeded in the TwithGQL loop, the for-loop continues. TODO: I should fix this.
+	RequestTimeLimit time.Duration
 	// If a VOD in the queue of live VODs is older than this, it is moved to the old VODs queue.
 	OldVodEvictionThreshold time.Duration
 	// The queue of old VODs for fetching .m3u8 will never exceed this size. The VODs with the lowest view counts are evicted.
@@ -336,7 +339,7 @@ func ScrapeTwitchLiveVodsWithGqlApi(params ScrapeTwitchLiveVodsWithGqlApiParams)
 		fetchTwitchGqlForeverParams{
 			ctx:                       ctx,
 			client:                    client,
-			twitchGqlRequestTimeLimit: params.TwitchGqlRequestTimeLimit,
+			twitchGqlRequestTimeLimit: params.RequestTimeLimit,
 			twitchGqlFetcherDelay:     params.TwitchGqlFetcherDelay,
 			cursorResetThreshold:      params.CursorResetThreshold,
 			oldVodEvictionThreshold:   params.OldVodEvictionThreshold,

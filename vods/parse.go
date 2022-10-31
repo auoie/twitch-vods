@@ -141,7 +141,6 @@ func (domainWithPaths *DomainWithPaths) GetFirstValidDWP(ctx context.Context) (*
 }
 
 func GetFirstValidDwp(ctx context.Context, domainWithPathsList []*DomainWithPaths) (*ValidDwpResponse, error) {
-
 	return firstnonerr.GetFirstNonError(
 		ctx,
 		domainWithPathsList,
