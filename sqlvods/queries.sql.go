@@ -61,13 +61,13 @@ func (q *Queries) DeleteStreams(ctx context.Context) error {
 
 const getEverything = `-- name: GetEverything :many
 SELECT
-  s.id, streamer_id, stream_id, start_time, max_views, last_updated_at, streamer_login_at_start, r.id, fetched_at, gzipped_bytes, streams_id
+  s.id, streamer_id, s.stream_id, start_time, max_views, last_updated_at, streamer_login_at_start, r.id, fetched_at, gzipped_bytes, r.stream_id, bytes_found
 FROM
   streams s
 LEFT JOIN
   recordings r
 ON
-  s.id = r.streams_id
+  s.stream_id = r.stream_id
 `
 
 type GetEverythingRow struct {
@@ -81,7 +81,8 @@ type GetEverythingRow struct {
 	ID_2                 uuid.NullUUID
 	FetchedAt            sql.NullTime
 	GzippedBytes         []byte
-	StreamsID            uuid.NullUUID
+	StreamID_2           sql.NullString
+	BytesFound           sql.NullBool
 }
 
 func (q *Queries) GetEverything(ctx context.Context) ([]GetEverythingRow, error) {
@@ -104,7 +105,8 @@ func (q *Queries) GetEverything(ctx context.Context) ([]GetEverythingRow, error)
 			&i.ID_2,
 			&i.FetchedAt,
 			&i.GzippedBytes,
-			&i.StreamsID,
+			&i.StreamID_2,
+			&i.BytesFound,
 		); err != nil {
 			return nil, err
 		}
@@ -124,7 +126,7 @@ FROM
 LEFT JOIN
   recordings r
 ON
-  s.id = r.streams_id
+  s.stream_id = r.stream_id
 WHERE
   s.stream_id = $1
 `
@@ -528,25 +530,32 @@ func (q *Queries) UpsertManyStreams(ctx context.Context, arg UpsertManyStreamsPa
 
 const upsertRecording = `-- name: UpsertRecording :exec
 INSERT INTO
-  recordings (fetched_at, gzipped_bytes, streams_id)
+  recordings (fetched_at, gzipped_bytes, stream_id, bytes_found)
 VALUES
-  ($1, $2, $3)
+  ($1, $2, $3, $4)
 ON CONFLICT
-  (streams_id)
+  (stream_id)
 DO
   UPDATE SET
     fetched_at = EXCLUDED.fetched_at,
-    gzipped_bytes = EXCLUDED.gzipped_bytes
+    gzipped_bytes = EXCLUDED.gzipped_bytes,
+    bytes_found = EXCLUDED.bytes_found
 `
 
 type UpsertRecordingParams struct {
 	FetchedAt    time.Time
 	GzippedBytes []byte
-	StreamsID    uuid.UUID
+	StreamID     string
+	BytesFound   bool
 }
 
 func (q *Queries) UpsertRecording(ctx context.Context, arg UpsertRecordingParams) error {
-	_, err := q.db.Exec(ctx, upsertRecording, arg.FetchedAt, arg.GzippedBytes, arg.StreamsID)
+	_, err := q.db.Exec(ctx, upsertRecording,
+		arg.FetchedAt,
+		arg.GzippedBytes,
+		arg.StreamID,
+		arg.BytesFound,
+	)
 	return err
 }
 

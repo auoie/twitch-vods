@@ -14,7 +14,8 @@ type Recording struct {
 	ID           uuid.UUID
 	FetchedAt    time.Time
 	GzippedBytes []byte
-	StreamsID    uuid.UUID
+	StreamID     string
+	BytesFound   bool
 }
 
 type Stream struct {

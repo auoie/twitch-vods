@@ -9,7 +9,6 @@ import (
 
 	"github.com/auoie/goVods/scraper"
 	"github.com/auoie/goVods/sqlvods"
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v4/pgxpool"
 )
 
@@ -138,11 +137,18 @@ func main() {
 	log.Println(len(streams))
 	log.Print()
 
-	err = queries.UpsertRecording(context.Background(), sqlvods.UpsertRecordingParams{FetchedAt: time.Now(), GzippedBytes: []byte{'a', 'b', 'c'}, StreamsID: uuid.UUID{}})
+	err = queries.UpsertRecording(context.Background(), sqlvods.UpsertRecordingParams{FetchedAt: time.Now(), GzippedBytes: []byte{'a', 'b', 'c'}, StreamID: "lskdjfslkjf", BytesFound: true})
 	log.Println(err)
 	log.Print()
 
-	logFatalOnError(queries.UpsertRecording(context.Background(), sqlvods.UpsertRecordingParams{FetchedAt: time.Now(), GzippedBytes: []byte{'a', 'b', 'c'}, StreamsID: streams[0].ID}))
+	logFatalOnError(queries.UpsertRecording(context.Background(), sqlvods.UpsertRecordingParams{FetchedAt: time.Now(), GzippedBytes: []byte{'a', 'b', 'c'}, StreamID: streams[0].StreamID, BytesFound: true}))
+	everything, err = queries.GetEverything(context.Background())
+	logFatalOnError(err)
+	log.Println(everything)
+	log.Println(len(everything))
+	log.Print()
+
+	logFatalOnError(queries.UpsertRecording(context.Background(), sqlvods.UpsertRecordingParams{FetchedAt: time.Now(), GzippedBytes: []byte{}, StreamID: streams[0].StreamID, BytesFound: false}))
 	everything, err = queries.GetEverything(context.Background())
 	logFatalOnError(err)
 	log.Println(everything)

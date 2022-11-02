@@ -133,21 +133,22 @@ FROM
 LEFT JOIN
   recordings r
 ON
-  s.id = r.streams_id
+  s.stream_id = r.stream_id
 WHERE
   s.stream_id = $1;
 
 -- name: UpsertRecording :exec
 INSERT INTO
-  recordings (fetched_at, gzipped_bytes, streams_id)
+  recordings (fetched_at, gzipped_bytes, stream_id, bytes_found)
 VALUES
-  ($1, $2, $3)
+  ($1, $2, $3, $4)
 ON CONFLICT
-  (streams_id)
+  (stream_id)
 DO
   UPDATE SET
     fetched_at = EXCLUDED.fetched_at,
-    gzipped_bytes = EXCLUDED.gzipped_bytes;
+    gzipped_bytes = EXCLUDED.gzipped_bytes,
+    bytes_found = EXCLUDED.bytes_found;
 
 -- name: GetEverything :many
 SELECT
@@ -157,7 +158,7 @@ FROM
 LEFT JOIN
   recordings r
 ON
-  s.id = r.streams_id;
+  s.stream_id = r.stream_id;
 
 -- name: DeleteStreams :exec
 DELETE FROM streams;

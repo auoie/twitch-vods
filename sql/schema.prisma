@@ -20,6 +20,9 @@ model recordings {
   id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   fetched_at    DateTime
   gzipped_bytes Bytes
-  stream        streams  @relation(fields: [streams_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  streams_id    String   @unique @db.Uuid
+  stream        streams  @relation(fields: [stream_id], references: [stream_id], onDelete: Cascade, onUpdate: Cascade)
+  stream_id     String   @unique
+  bytes_found   Boolean
+
+  @@index([bytes_found])
 }

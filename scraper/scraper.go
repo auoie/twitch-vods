@@ -9,6 +9,7 @@ import (
 
 	"github.com/4kills/go-libdeflate/v2"
 	"github.com/Khan/genqlient/graphql"
+	"github.com/auoie/goVods/sqlvods"
 	"github.com/auoie/goVods/twitchgql"
 	"github.com/auoie/goVods/vods"
 )
@@ -37,9 +38,10 @@ func (vod *LiveVod) GetVideoData() *vods.VideoData {
 }
 
 type VodResult struct {
-	Vod           *LiveVod
-	HlsBytes      []byte
-	HlsBytesFound bool
+	Vod              *LiveVod
+	HlsBytes         []byte
+	HlsBytesFound    bool
+	RequestInitiated time.Time
 }
 
 func edgeNodesMatchingAndNonEmpty(
@@ -69,6 +71,25 @@ type fetchTwitchGqlForeverParams struct {
 	oldVodEvictionThreshold   time.Duration
 	oldVodsCh                 chan []*LiveVod
 	minViewerCountToObserve   int
+	queries                   *sqlvods.Queries
+	done                      chan struct{}
+}
+
+func twitchGqlResponseToSqlParams(
+	streams []twitchgql.GetStreamsStreamsStreamConnectionEdgesStreamEdge,
+	responseReturnedTime time.Time,
+) sqlvods.UpsertManyStreamsParams {
+	result := sqlvods.UpsertManyStreamsParams{}
+	for _, stream := range streams {
+		node := stream.Node
+		result.LastUpdatedAtArr = append(result.LastUpdatedAtArr, responseReturnedTime)
+		result.MaxViewsArr = append(result.MaxViewsArr, int64(node.ViewersCount))
+		result.StartTimeArr = append(result.StartTimeArr, node.CreatedAt)
+		result.StreamIDArr = append(result.StreamIDArr, node.Id)
+		result.StreamerIDArr = append(result.StreamerIDArr, node.Broadcaster.Id)
+		result.StreamerLoginAtStartArr = append(result.StreamerLoginAtStartArr, node.Broadcaster.Login)
+	}
+	return result
 }
 
 func fetchTwitchGqlForever(params fetchTwitchGqlForeverParams) {
@@ -90,6 +111,11 @@ func fetchTwitchGqlForever(params fetchTwitchGqlForeverParams) {
 	prevEdges := []twitchgql.GetStreamsStreamsStreamConnectionEdgesStreamEdge{}
 	debugMod := 10
 	for {
+		select {
+		case <-params.ctx.Done():
+			return
+		case <-twitchGqlTicker.C:
+		}
 		debugIndex++
 		debugQueueSizeStart := liveVodQueue.Size()
 		if time.Now().After(resetCursorTimeout) {
@@ -100,15 +126,18 @@ func fetchTwitchGqlForever(params fetchTwitchGqlForeverParams) {
 		streams, err := twitchgql.GetStreams(requestCtx, params.client, 30, cursor)
 		responseReturnedTime := time.Now()
 		requestCancel()
-		select {
-		case <-params.ctx.Done():
-			return
-		case <-twitchGqlTicker.C:
-		}
 		if err != nil {
 			log.Println(fmt.Sprint("Twitch graphql client reported an error: ", err))
+			continue
 		}
+		requestCtx, requestCancel = context.WithTimeout(params.ctx, params.twitchGqlRequestTimeLimit)
 		edges := streams.Streams.Edges
+		err = params.queries.UpsertManyStreams(requestCtx, twitchGqlResponseToSqlParams(edges, responseReturnedTime))
+		requestCancel()
+		if err != nil {
+			log.Println(fmt.Sprint("Upserting streams to streams table failed: ", err))
+			break
+		}
 		if len(edges) == 0 {
 			log.Println("edges has length 0")
 			resetCursor()
@@ -185,6 +214,10 @@ func fetchTwitchGqlForever(params fetchTwitchGqlForeverParams) {
 			return
 		case params.oldVodsCh <- oldVods:
 		}
+	}
+	select {
+	case params.done <- struct{}{}:
+	case <-params.ctx.Done():
 	}
 }
 
@@ -285,13 +318,14 @@ func hlsWorkerFetchCompressSend(params hlsWorkerFetchCompressSendParams) {
 			return
 		}
 		requestCtx, cancel := context.WithTimeout(params.ctx, params.m3u8RequestTimeLimit)
+		requestInitiated := time.Now()
 		bytes, err := getVodCompressedBytes(requestCtx, oldVod.GetVideoData(), params.compressor)
 		cancel()
 		var result *VodResult
 		if err != nil {
-			result = &VodResult{Vod: oldVod, HlsBytes: nil, HlsBytesFound: false}
+			result = &VodResult{Vod: oldVod, HlsBytes: []byte{}, HlsBytesFound: false, RequestInitiated: requestInitiated}
 		} else {
-			result = &VodResult{Vod: oldVod, HlsBytes: bytes, HlsBytesFound: true}
+			result = &VodResult{Vod: oldVod, HlsBytes: bytes, HlsBytesFound: true, RequestInitiated: requestInitiated}
 		}
 		select {
 		case <-params.ctx.Done():
@@ -323,6 +357,8 @@ type ScrapeTwitchLiveVodsWithGqlApiParams struct {
 	LibdeflateCompressionLevel int
 	// The queue of live VODs includes a VOD iff a VOD has at least this number of viewers.
 	MinViewerCountToObserve int
+	// sqlc queries instance
+	Queries *sqlvods.Queries
 }
 
 // This function scares me.
@@ -334,6 +370,7 @@ func ScrapeTwitchLiveVodsWithGqlApi(params ScrapeTwitchLiveVodsWithGqlApiParams)
 	oldVodsCh := make(chan []*LiveVod)
 	oldVodJobsCh := make(chan *LiveVod)
 	resultsCh := make(chan *VodResult)
+	done := make(chan struct{})
 	log.Println("Made twitchgql client and channels.")
 	go fetchTwitchGqlForever(
 		fetchTwitchGqlForeverParams{
@@ -345,6 +382,8 @@ func ScrapeTwitchLiveVodsWithGqlApi(params ScrapeTwitchLiveVodsWithGqlApiParams)
 			oldVodEvictionThreshold:   params.OldVodEvictionThreshold,
 			oldVodsCh:                 oldVodsCh,
 			minViewerCountToObserve:   params.MinViewerCountToObserve,
+			queries:                   params.Queries,
+			done:                      done,
 		},
 	)
 	go processOldVodJobs(processOldVodJobsParams{
@@ -373,9 +412,26 @@ func ScrapeTwitchLiveVodsWithGqlApi(params ScrapeTwitchLiveVodsWithGqlApiParams)
 			log.Println("Result was logged:")
 			log.Println(*result.Vod)
 			log.Println(fmt.Sprint("Gzipped size: ", len(result.HlsBytes)))
-			// send result to a database
+			upsertRecordingParams := sqlvods.UpsertRecordingParams{
+				FetchedAt:    result.RequestInitiated,
+				GzippedBytes: result.HlsBytes,
+				StreamID:     result.Vod.StreamId,
+				BytesFound:   result.HlsBytesFound,
+			}
+			err := params.Queries.UpsertRecording(params.Ctx, upsertRecordingParams)
+			if err != nil {
+				log.Println(fmt.Sprint("upserting recording failed: ", err))
+				break
+			}
+		}
+		select {
+		case <-ctx.Done():
+		case done <- struct{}{}:
 		}
 	}()
-	<-ctx.Done()
+	select {
+	case <-done:
+	case <-ctx.Done():
+	}
 	return nil
 }

@@ -16,7 +16,8 @@ CREATE TABLE "recordings" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "fetched_at" TIMESTAMP(3) NOT NULL,
     "gzipped_bytes" BYTEA NOT NULL,
-    "streams_id" UUID NOT NULL,
+    "stream_id" TEXT NOT NULL,
+    "bytes_found" BOOLEAN NOT NULL,
 
     CONSTRAINT "recordings_pkey" PRIMARY KEY ("id")
 );
@@ -28,7 +29,10 @@ CREATE UNIQUE INDEX "streams_stream_id_key" ON "streams"("stream_id");
 CREATE INDEX "streams_streamer_id_start_time_idx" ON "streams"("streamer_id", "start_time" DESC);
 
 -- CreateIndex
-CREATE UNIQUE INDEX "recordings_streams_id_key" ON "recordings"("streams_id");
+CREATE UNIQUE INDEX "recordings_stream_id_key" ON "recordings"("stream_id");
+
+-- CreateIndex
+CREATE INDEX "recordings_bytes_found_idx" ON "recordings"("bytes_found");
 
 -- AddForeignKey
-ALTER TABLE "recordings" ADD CONSTRAINT "recordings_streams_id_fkey" FOREIGN KEY ("streams_id") REFERENCES "streams"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "recordings" ADD CONSTRAINT "recordings_stream_id_fkey" FOREIGN KEY ("stream_id") REFERENCES "streams"("stream_id") ON DELETE CASCADE ON UPDATE CASCADE;
