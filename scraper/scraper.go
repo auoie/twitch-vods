@@ -130,14 +130,7 @@ func fetchTwitchGqlForever(params fetchTwitchGqlForeverParams) {
 			log.Println(fmt.Sprint("Twitch graphql client reported an error: ", err))
 			continue
 		}
-		requestCtx, requestCancel = context.WithTimeout(params.ctx, params.twitchGqlRequestTimeLimit)
 		edges := streams.Streams.Edges
-		err = params.queries.UpsertManyStreams(requestCtx, twitchGqlResponseToSqlParams(edges, responseReturnedTime))
-		requestCancel()
-		if err != nil {
-			log.Println(fmt.Sprint("Upserting streams to streams table failed: ", err))
-			break
-		}
 		if len(edges) == 0 {
 			log.Println("edges has length 0")
 			resetCursor()
@@ -164,10 +157,12 @@ func fetchTwitchGqlForever(params fetchTwitchGqlForeverParams) {
 		prevEdges = edges
 		oldVods := []*LiveVod{}
 		allVodsLessThanMinViewerCount := true
+		highViewEdges := []twitchgql.GetStreamsStreamsStreamConnectionEdgesStreamEdge{}
 		for _, edge := range edges {
 			if edge.Node.ViewersCount < params.minViewerCountToObserve {
 				continue
 			}
+			highViewEdges = append(highViewEdges, edge)
 			allVodsLessThanMinViewerCount = false
 			evictedVod, err := liveVodQueue.UpsertVod(
 				responseReturnedTime,
@@ -178,6 +173,13 @@ func fetchTwitchGqlForever(params fetchTwitchGqlForeverParams) {
 			}
 			log.Println("Streamer restarted stream: ", evictedVod.StreamerLoginAtStart)
 			oldVods = append(oldVods, evictedVod)
+		}
+		requestCtx, requestCancel = context.WithTimeout(params.ctx, params.twitchGqlRequestTimeLimit)
+		err = params.queries.UpsertManyStreams(requestCtx, twitchGqlResponseToSqlParams(highViewEdges, responseReturnedTime))
+		requestCancel()
+		if err != nil {
+			log.Println(fmt.Sprint("Upserting streams to streams table failed: ", err))
+			break
 		}
 		if debugIndex%debugMod == 0 {
 			log.Println(fmt.Sprint("Live VOD queue size after upserts: ", liveVodQueue.Size()))
