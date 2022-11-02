@@ -127,6 +127,7 @@ func fetchTwitchGqlForever(params fetchTwitchGqlForeverParams) {
 		responseReturnedTime := time.Now()
 		requestCancel()
 		if err != nil {
+			resetCursor()
 			log.Println(fmt.Sprint("Twitch graphql client reported an error: ", err))
 			continue
 		}
@@ -364,6 +365,11 @@ type ScrapeTwitchLiveVodsWithGqlApiParams struct {
 }
 
 // This function scares me.
+// This function scrapes the Twitch Graphql API and fetches .m3u8 files for streams that finish.
+// It doesn't exit if a Twitch Graphql API request fails.
+// Instead, it resets the cursor and starts over.
+// It stores the results in a database with concurrent updates, so you should use a queries struct that is safe for that.
+// If any database query or modification returns an error, the function finishes and cleans up all resources.
 func ScrapeTwitchLiveVodsWithGqlApi(params ScrapeTwitchLiveVodsWithGqlApiParams) error {
 	log.Println("Starting scraping...")
 	ctx, cancel := context.WithCancel(params.Ctx)
