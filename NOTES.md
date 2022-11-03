@@ -198,3 +198,8 @@ Instead, I should just use `:many` and then check the size.
 
 The most type safe approach is probably batching with `:batchmany`, while also checking that the length
 of each returned value is 1.
+
+## Twitch
+
+The Twitch GraphQL resolver for videos (in particular, past broadcasts) went down for a short period.
+I should not trust the graphql API to work all the time.
