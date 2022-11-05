@@ -5,14 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
+	"github.com/Khan/genqlient/graphql"
 	"github.com/auoie/goVods/twitchgql"
 )
 
-func main() {
-	fmt.Println("Running...")
-	graphqlClient := twitchgql.NewTwitchGqlClient()
+func runForever(graphqlClient graphql.Client) error {
 	done := make(chan error)
 	count := 0
 	ticker := time.NewTicker(500 * time.Millisecond)
@@ -47,6 +47,32 @@ func main() {
 		}
 		done <- goForever()
 	}()
-	err := <-done
-	fmt.Print(err)
+	return <-done
+}
+
+func print(response any) error {
+	bytes, err := json.MarshalIndent(response, "", "  ")
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(bytes))
+	return nil
+}
+
+func threeUsersInformation(graphqlClient graphql.Client, user1, user2, user3 string) error {
+	response, err := twitchgql.GetThreeUsers(context.Background(), graphqlClient, user1, user2, user3)
+	if err != nil {
+		return err
+	}
+	print(response)
+	return nil
+}
+
+func main() {
+	fmt.Println("Running...")
+	graphqlClient := twitchgql.NewTwitchGqlClient()
+	err := threeUsersInformation(graphqlClient, "gmhikaru", "xqc", "malek_04")
+	if err != nil {
+		log.Fatal(err)
+	}
 }

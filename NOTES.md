@@ -199,7 +199,44 @@ Instead, I should just use `:many` and then check the size.
 The most type safe approach is probably batching with `:batchmany`, while also checking that the length
 of each returned value is 1.
 
+Running the query
+
+```sql
+SELECT s.*, r.bytes_found, r.fetched_at, r.bytes_found, length(r.gzipped_bytes) AS gzipped_bytes_length FROM streams s JOIN recordings r ON s.stream_id = r.stream_id ORDER BY r.fetched_at DESC LIMIT 40;
+```
+
+gives the error
+
+```text
+could not resize shared memory segment "/PostgreSQL.1928016196" to 33554432 bytes: No space left on device
+CONTEXT:  parallel worker
+```
+
+Running the query
+
+```sql
+SELECT s.*, r.bytes_found, r.fetched_at, r.bytes_found FROM streams s JOIN recordings r ON s.stream_id = r.stream_id ORDER BY r.fetched_at DESC LIMIT 40;
+```
+
+gives results.
+I'm guessing it failed because it might keep all of the gzipped bytes in memory.
+
 ## Twitch
 
 The Twitch GraphQL resolver for videos (in particular, past broadcasts) went down for a short period.
 I should not trust the graphql API to work all the time.
+
+## TODO
+
+- Use the TwitchGQL API to determine if a VOD is subonly and if it's unlisted.
+  Upload this to the database.
+  I should update the schema of the Recordings Table.
+- Populate the live VODs queue using the database when the program restarts.
+- Add parameters for the cursor offset factor (change it from 2/3 to 0.667 as well)
+- Add parameter for the minimum max view value in order to actually upload a recording to the database
+- Make a way to evict the gzipped bytes every 60 days. Decide whether I should keep the recording or not.
+- When I turn on my VPN and turn if off, the Twitch GQL requests work but the cloudfront requests don't work.
+I should try to understand why and fix it.
+- Add some private API so that I can configure the client ID and set of cloudfront domains at runtime.
+Maybe put these in a database so that I can retrieve them if the program restarts.
+Maybe have some additional service that monitors for client id and cloudfront domains to periodically update the database.

@@ -29,3 +29,53 @@ query GetStreams($first: Int!, $cursor: Cursor!) {
     }
   }
 }
+
+fragment UserInfo on User {
+  login
+  lastBroadcast {
+    id
+    startedAt
+    game {
+      displayName
+    }
+  }
+  videos(type: ARCHIVE, options: { includePrivate: false }, first: 3) {
+    edges {
+      node {
+        id
+        isDeleted
+        lengthSeconds
+        previewThumbnailURL
+        publishedAt
+        recordedAt
+        scope
+        seekPreviewsURL
+        broadcastType
+        status
+        updatedAt
+        createdAt
+        deletedAt
+        viewCount
+      }
+    }
+  }
+  subscriptionProducts {
+    type
+    hasAdFree
+    hasSubOnlyChat
+    tier
+    hasSubonlyVideoArchive
+  }
+}
+
+query GetThreeUsers($user1: String!, $user2: String!, $user3: String!) {
+  user1: user(login: $user1) {
+    ...UserInfo
+  }
+  user2: user(login: $user2) {
+    ...UserInfo
+  }
+  user3: user(login: $user3) {
+    ...UserInfo
+  }
+}
