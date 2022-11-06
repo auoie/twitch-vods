@@ -237,6 +237,7 @@ I should not trust the graphql API to work all the time.
 - Make a way to evict the gzipped bytes every 60 days. Decide whether I should keep the recording or not.
 - When I turn on my VPN and turn if off, the Twitch GQL requests work but the cloudfront requests don't work.
 I should try to understand why and fix it.
+- Print debugging statements and errors separately.
 - Add some private API so that I can configure the client ID and set of cloudfront domains at runtime.
 Maybe put these in a database so that I can retrieve them if the program restarts.
 Maybe have some additional service that monitors for client id and cloudfront domains to periodically update the database.
