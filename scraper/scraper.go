@@ -2,7 +2,6 @@ package scraper
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -302,23 +301,17 @@ type hlsWorkerFetchCompressSendParams struct {
 func hlsWorkerFetchCompressSend(params hlsWorkerFetchCompressSendParams) {
 	hlsFetcherTicker := time.NewTicker(params.hlsFetcherDelay)
 	defer params.compressor.Close()
-	getOldVodJob := func() (*LiveVod, error) {
-		select {
-		case <-params.ctx.Done():
-			return nil, errors.New("context done")
-		case oldVod := <-params.oldVodJobsCh:
-			return oldVod, nil
-		}
-	}
 	for {
 		select {
 		case <-params.ctx.Done():
 			return
 		case <-hlsFetcherTicker.C:
 		}
-		oldVod, err := getOldVodJob()
-		if err != nil {
+		var oldVod *LiveVod
+		select {
+		case <-params.ctx.Done():
 			return
+		case oldVod = <-params.oldVodJobsCh:
 		}
 		requestCtx, cancel := context.WithTimeout(params.ctx, params.m3u8RequestTimeLimit)
 		requestInitiated := time.Now()
