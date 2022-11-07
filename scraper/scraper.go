@@ -70,7 +70,10 @@ type fetchTwitchGqlForeverParams struct {
 	oldVodEvictionThreshold   time.Duration
 	oldVodsCh                 chan []*LiveVod
 	minViewerCountToObserve   int
+	minViewerCountToRecord    int
 	queries                   *sqlvods.Queries
+	numStreamsPerRequest      int
+	cursorFactor              float64
 	done                      chan struct{}
 }
 
@@ -122,7 +125,7 @@ func fetchTwitchGqlForever(params fetchTwitchGqlForeverParams) {
 			resetCursor()
 		}
 		requestCtx, requestCancel := context.WithTimeout(params.ctx, params.twitchGqlRequestTimeLimit)
-		streams, err := twitchgql.GetStreams(requestCtx, params.client, 30, cursor)
+		streams, err := twitchgql.GetStreams(requestCtx, params.client, params.numStreamsPerRequest, cursor)
 		responseReturnedTime := time.Now()
 		requestCancel()
 		if err != nil {
@@ -151,7 +154,7 @@ func fetchTwitchGqlForever(params fetchTwitchGqlForeverParams) {
 				log.Println("edges: ", edges)
 				cursor = edges[len(edges)-1].Cursor
 			} else {
-				cursor = edges[2*len(edges)/3].Cursor
+				cursor = edges[int(params.cursorFactor*float64(len(edges)))].Cursor
 			}
 		}
 		prevEdges = edges
@@ -202,7 +205,9 @@ func fetchTwitchGqlForever(params fetchTwitchGqlForeverParams) {
 				break
 			}
 			liveVodQueue.RemoveVod(stalestVod)
-			oldVods = append(oldVods, stalestVod)
+			if stalestVod.MaxViews >= params.minViewerCountToRecord {
+				oldVods = append(oldVods, stalestVod)
+			}
 		}
 		if debugIndex%debugMod == 0 {
 			log.Println(fmt.Sprint("Live VOD queue size after removing stale VODS: ", liveVodQueue.Size()))
@@ -353,6 +358,12 @@ type ScrapeTwitchLiveVodsWithGqlApiParams struct {
 	LibdeflateCompressionLevel int
 	// The queue of live VODs includes a VOD iff a VOD has at least this number of viewers.
 	MinViewerCountToObserve int
+	// The queue of old VODs includes a VOD iff a VOD has at least this number of viewers.
+	MinViewerCountToRecord int
+	// Num streams per request (must be between 1 and 30 inclusive)
+	NumStreamsPerRequest int
+	// Cursor at index CursorFactor * len(edges) is used. So it must satisfy 0 <= CursorFactor < 1 to not panic.
+	CursorFactor float64
 	// sqlc queries instance
 	Queries *sqlvods.Queries
 }
@@ -383,7 +394,10 @@ func ScrapeTwitchLiveVodsWithGqlApi(params ScrapeTwitchLiveVodsWithGqlApiParams)
 			oldVodEvictionThreshold:   params.OldVodEvictionThreshold,
 			oldVodsCh:                 oldVodsCh,
 			minViewerCountToObserve:   params.MinViewerCountToObserve,
+			minViewerCountToRecord:    params.MinViewerCountToRecord,
 			queries:                   params.Queries,
+			numStreamsPerRequest:      params.NumStreamsPerRequest,
+			cursorFactor:              params.CursorFactor,
 			done:                      done,
 		},
 	)
