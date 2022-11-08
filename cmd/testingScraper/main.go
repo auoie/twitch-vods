@@ -33,7 +33,7 @@ func main() {
 			RequestTimeLimit:           5 * time.Second,
 			OldVodEvictionThreshold:    15 * time.Minute,
 			MaxOldVodsQueueSize:        50000,
-			NumHlsFetchers:             5,
+			NumHlsFetchers:             4,
 			HlsFetcherDelay:            time.Second,
 			CursorResetThreshold:       5 * time.Minute,
 			LibdeflateCompressionLevel: 1,

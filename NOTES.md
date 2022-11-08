@@ -228,9 +228,9 @@ I should not trust the graphql API to work all the time.
 
 ## TODO
 
-- Use the TwitchGQL API to determine if a VOD is subonly and if it's unlisted.
-  Upload this to the database.
-  I should update the schema of the Recordings Table.
+- Right now, if a stream is under the minimum views to record, but the stream was observed to have been stopped and restarted,
+I still record the old VOD. This seems fine.
+I just don't like recordings streams that are still going.
 - Populate the live VODs queue using the database when the program restarts.
 - Make a way to evict the gzipped bytes every 60 days. Decide whether I should keep the recording or not.
 - When I turn on my VPN and turn if off, the Twitch GQL requests work but the cloudfront requests don't work.

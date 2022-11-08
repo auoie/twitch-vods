@@ -450,6 +450,7 @@ type ScrapeTwitchLiveVodsWithGqlApiParams struct {
 	// The queue of live VODs includes a VOD iff a VOD has at least this number of viewers.
 	MinViewerCountToObserve int
 	// The queue of old VODs includes a VOD iff a VOD has at least this number of viewers.
+	// If a stream is observed to hvae stopped and then restarted, the stream is still recorded.
 	MinViewerCountToRecord int
 	// Num streams per request (must be between 1 and 30 inclusive)
 	NumStreamsPerRequest int
