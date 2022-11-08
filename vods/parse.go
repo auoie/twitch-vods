@@ -9,7 +9,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -43,18 +45,18 @@ type VideoData struct {
 	Time         time.Time
 }
 
-type videoPath struct {
-	urlPath   string // e.g. {hash}_{streamername}_{videoid}_{unixtime}
-	videoData *VideoData
+type VideoPath struct {
+	UrlPath   string // e.g. {hash}_{streamername}_{videoid}_{unixtime}
+	VideoData *VideoData
 }
 type DomainWithPath struct {
-	domain string // e.g. https://d1m7jfoe9zdc1j.cloudfront.net/
-	path   *videoPath
+	Domain string // e.g. https://d1m7jfoe9zdc1j.cloudfront.net/
+	Path   *VideoPath
 }
 
 type DomainWithPaths struct {
 	domain string // e.g. https://d1m7jfoe9zdc1j.cloudfront.net/
-	paths  []*videoPath
+	paths  []*VideoPath
 }
 
 type ValidDwpResponse struct {
@@ -67,13 +69,64 @@ type urlIndexResponse struct {
 	valid bool
 }
 
+// e.g. c5992ececce7bd7d350d_gmhikaru_47198535725_1664038929
+func UrlPathToVideoData(urlPath string) (*VideoData, error) {
+	allUnderscoreIndices := []int{}
+	for i := 0; i < len(urlPath); i++ {
+		char := urlPath[i]
+		if char == '_' {
+			allUnderscoreIndices = append(allUnderscoreIndices, i)
+		}
+	}
+	numUnderscores := len(allUnderscoreIndices)
+	if numUnderscores < 3 {
+		return nil, errors.New("url path does not have enough underscores")
+	}
+	underscoreIndices := [3]int{allUnderscoreIndices[0], allUnderscoreIndices[numUnderscores-2], allUnderscoreIndices[numUnderscores-1]}
+	streamerName := urlPath[underscoreIndices[0]+1 : underscoreIndices[1]]
+	videoid := urlPath[underscoreIndices[1]+1 : underscoreIndices[2]]
+	unixtimeString := urlPath[underscoreIndices[2]+1:]
+	unixtimeInt, err := strconv.ParseInt(unixtimeString, 10, 64)
+	if err != nil {
+		return nil, err
+	}
+	videoTime := time.Unix(unixtimeInt, 0)
+	return &VideoData{StreamerName: streamerName, VideoId: videoid, Time: videoTime}, nil
+}
+
+// e.g. https://d1m7jfoe9zdc1j.cloudfront.net/c5992ececce7bd7d350d_gmhikaru_47198535725_1664038929
+// e.g. https://d1m7jfoe9zdc1j.cloudfront.net/c5992ececce7bd7d350d_gmhikaru_47198535725_1664038929/storyboards/1600104857-info.json
+func UrlToDomainWithPath(urlStr string) (*DomainWithPath, error) {
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return nil, err
+	}
+	pathParts := strings.Split(u.Path, "/")
+	if len(pathParts) < 2 {
+		return nil, errors.New("url is not valid")
+	}
+	mainPart := pathParts[1]
+	videoData, err := UrlPathToVideoData(mainPart)
+	if err != nil {
+		return nil, err
+	}
+	result := DomainWithPath{
+		Domain: fmt.Sprint(u.Scheme, "://", u.Host, "/"),
+		Path: &VideoPath{
+			UrlPath:   mainPart,
+			VideoData: videoData,
+		},
+	}
+	return &result, nil
+}
+
 func (videoData *VideoData) String() string {
 	values := []string{videoData.StreamerName, videoData.Time.Format("2006-01-02_15:04:05"), videoData.VideoId}
 	return strings.Join(values, "_")
 }
 
-func (videoData *VideoData) GetVideoPath() *videoPath {
-	return &videoPath{urlPath: videoData.GetUrlPath(), videoData: videoData}
+func (videoData *VideoData) GetVideoPath() *VideoPath {
+	return &VideoPath{UrlPath: videoData.GetUrlPath(), VideoData: videoData}
 }
 
 func (videoData *VideoData) GetUrlPath() string {
@@ -96,7 +149,7 @@ func (videoData *VideoData) WithOffset(seconds int) *VideoData {
 }
 
 func (videoData *VideoData) GetDomainWithPathsList(domains []string, seconds int) []*DomainWithPaths {
-	videoPaths := []*videoPath{}
+	videoPaths := []*VideoPath{}
 	for i := 0; i < seconds; i++ {
 		videoPaths = append(videoPaths, videoData.WithOffset(i).GetVideoPath())
 	}
@@ -111,7 +164,7 @@ func (domainWithPaths *DomainWithPaths) ToListOfDomainWithPath() []*DomainWithPa
 	result := []*DomainWithPath{}
 	domain := domainWithPaths.domain
 	for _, path := range domainWithPaths.paths {
-		result = append(result, &DomainWithPath{domain: domain, path: path})
+		result = append(result, &DomainWithPath{Domain: domain, Path: path})
 	}
 	return result
 }
@@ -151,19 +204,19 @@ func GetFirstValidDwp(ctx context.Context, domainWithPathsList []*DomainWithPath
 }
 
 func (d *DomainWithPath) GetDomain() string {
-	return d.domain
+	return d.Domain
 }
 
 func (d *DomainWithPath) GetVideoData() *VideoData {
-	return d.path.videoData
+	return d.Path.VideoData
 }
 
 func (d *DomainWithPath) GetIndexDvrUrl() string {
-	return d.domain + d.path.urlPath + "/chunked/index-dvr.m3u8"
+	return d.Domain + d.Path.UrlPath + "/chunked/index-dvr.m3u8"
 }
 
 func (d *DomainWithPath) GetSegmentChunkedUrl(segment *m3u8.MediaSegment) string {
-	return d.domain + d.path.urlPath + "/chunked/" + segment.URI
+	return d.Domain + d.Path.UrlPath + "/chunked/" + segment.URI
 }
 
 func (d *DomainWithPath) MakePathsExplicit(playlist *m3u8.MediaPlaylist) *m3u8.MediaPlaylist {

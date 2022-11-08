@@ -61,7 +61,7 @@ func (q *Queries) DeleteStreams(ctx context.Context) error {
 
 const getEverything = `-- name: GetEverything :many
 SELECT
-  s.id, streamer_id, s.stream_id, start_time, max_views, last_updated_at, streamer_login_at_start, r.id, fetched_at, gzipped_bytes, r.stream_id, bytes_found
+  s.id, streamer_id, s.stream_id, start_time, max_views, last_updated_at, streamer_login_at_start, r.id, r.stream_id, fetched_at, gzipped_bytes, hls_domain, bytes_found, public, sub_only, seek_previews_domain
 FROM
   streams s
 LEFT JOIN
@@ -79,10 +79,14 @@ type GetEverythingRow struct {
 	LastUpdatedAt        time.Time
 	StreamerLoginAtStart string
 	ID_2                 uuid.NullUUID
+	StreamID_2           sql.NullString
 	FetchedAt            sql.NullTime
 	GzippedBytes         []byte
-	StreamID_2           sql.NullString
+	HlsDomain            sql.NullString
 	BytesFound           sql.NullBool
+	Public               sql.NullBool
+	SubOnly              sql.NullBool
+	SeekPreviewsDomain   sql.NullString
 }
 
 func (q *Queries) GetEverything(ctx context.Context) ([]GetEverythingRow, error) {
@@ -103,10 +107,14 @@ func (q *Queries) GetEverything(ctx context.Context) ([]GetEverythingRow, error)
 			&i.LastUpdatedAt,
 			&i.StreamerLoginAtStart,
 			&i.ID_2,
+			&i.StreamID_2,
 			&i.FetchedAt,
 			&i.GzippedBytes,
-			&i.StreamID_2,
+			&i.HlsDomain,
 			&i.BytesFound,
+			&i.Public,
+			&i.SubOnly,
+			&i.SeekPreviewsDomain,
 		); err != nil {
 			return nil, err
 		}
@@ -530,31 +538,43 @@ func (q *Queries) UpsertManyStreams(ctx context.Context, arg UpsertManyStreamsPa
 
 const upsertRecording = `-- name: UpsertRecording :exec
 INSERT INTO
-  recordings (fetched_at, gzipped_bytes, stream_id, bytes_found)
+  recordings (stream_id, fetched_at, hls_domain, gzipped_bytes, bytes_found, seek_previews_domain, public, sub_only)
 VALUES
-  ($1, $2, $3, $4)
+  ($1, $2, $3, $4, $5, $6, $7, $8)
 ON CONFLICT
   (stream_id)
 DO
   UPDATE SET
     fetched_at = EXCLUDED.fetched_at,
+    hls_domain = EXCLUDED.hls_domain,
     gzipped_bytes = EXCLUDED.gzipped_bytes,
-    bytes_found = EXCLUDED.bytes_found
+    bytes_found = EXCLUDED.bytes_found,
+    seek_previews_domain = EXCLUDED.seek_previews_domain,
+    public = EXCLUDED.public,
+    sub_only = EXCLUDED.sub_only
 `
 
 type UpsertRecordingParams struct {
-	FetchedAt    time.Time
-	GzippedBytes []byte
-	StreamID     string
-	BytesFound   bool
+	StreamID           string
+	FetchedAt          time.Time
+	HlsDomain          sql.NullString
+	GzippedBytes       []byte
+	BytesFound         bool
+	SeekPreviewsDomain sql.NullString
+	Public             sql.NullBool
+	SubOnly            sql.NullBool
 }
 
 func (q *Queries) UpsertRecording(ctx context.Context, arg UpsertRecordingParams) error {
 	_, err := q.db.Exec(ctx, upsertRecording,
-		arg.FetchedAt,
-		arg.GzippedBytes,
 		arg.StreamID,
+		arg.FetchedAt,
+		arg.HlsDomain,
+		arg.GzippedBytes,
 		arg.BytesFound,
+		arg.SeekPreviewsDomain,
+		arg.Public,
+		arg.SubOnly,
 	)
 	return err
 }

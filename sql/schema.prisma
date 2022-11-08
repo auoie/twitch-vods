@@ -17,12 +17,17 @@ model streams {
 }
 
 model recordings {
-  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  fetched_at    DateTime
-  gzipped_bytes Bytes
-  stream        streams  @relation(fields: [stream_id], references: [stream_id], onDelete: Cascade, onUpdate: Cascade)
-  stream_id     String   @unique
-  bytes_found   Boolean
+  id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  stream_id            String   @unique
+  fetched_at           DateTime
+  gzipped_bytes        Bytes?
+  hls_domain           String?
+  bytes_found          Boolean
+  public               Boolean?
+  sub_only             Boolean?
+  seek_previews_domain String?
+
+  stream streams @relation(fields: [stream_id], references: [stream_id], onDelete: Cascade, onUpdate: Cascade)
 
   @@index([bytes_found])
 }

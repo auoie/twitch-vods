@@ -232,8 +232,6 @@ I should not trust the graphql API to work all the time.
   Upload this to the database.
   I should update the schema of the Recordings Table.
 - Populate the live VODs queue using the database when the program restarts.
-- Add parameters for the cursor offset factor (change it from 2/3 to 0.667 as well)
-- Add parameter for the minimum max view value in order to actually upload a recording to the database
 - Make a way to evict the gzipped bytes every 60 days. Decide whether I should keep the recording or not.
 - When I turn on my VPN and turn if off, the Twitch GQL requests work but the cloudfront requests don't work.
 I should try to understand why and fix it.

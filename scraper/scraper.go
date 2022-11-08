@@ -2,6 +2,7 @@ package scraper
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/auoie/goVods/sqlvods"
 	"github.com/auoie/goVods/twitchgql"
 	"github.com/auoie/goVods/vods"
+	"github.com/grafov/m3u8"
 )
 
 type VodDataPoint struct {
@@ -37,10 +39,14 @@ func (vod *LiveVod) GetVideoData() *vods.VideoData {
 }
 
 type VodResult struct {
-	Vod              *LiveVod
-	HlsBytes         []byte
-	HlsBytesFound    bool
-	RequestInitiated time.Time
+	Vod                *LiveVod
+	HlsBytes           []byte
+	HlsBytesFound      bool
+	RequestInitiated   time.Time
+	HlsDomain          sql.NullString
+	SeekPreviewsDomain sql.NullString
+	Public             sql.NullBool
+	SubOnly            sql.NullBool
 }
 
 func edgeNodesMatchingAndNonEmpty(
@@ -268,39 +274,98 @@ func processOldVodJobs(params processOldVodJobsParams) {
 	}
 }
 
-// Find the .m3u8 for a video and return the compressed bytes.
-func getVodCompressedBytes(ctx context.Context, videoData *vods.VideoData, compressor *libdeflate.Compressor) ([]byte, error) {
+func getFirstValidDwpResponse(ctx context.Context, videoData *vods.VideoData) (*vods.ValidDwpResponse, error) {
 	dwp, err := vods.GetFirstValidDwp(ctx, videoData.GetDomainWithPathsList(vods.DOMAINS, 1))
 	if err != nil {
-		log.Println(fmt.Sprint("Link was not found for ", videoData.StreamerName, " because: ", err))
 		return nil, err
 	}
+	return dwp, nil
+}
+
+func getCleanedMediaPlaylistBytes(dwp *vods.ValidDwpResponse) (*m3u8.MediaPlaylist, error) {
 	mediapl, err := vods.DecodeMediaPlaylistFilterNilSegments(dwp.Body, true)
 	if err != nil {
-		log.Println(fmt.Sprint("Removing nil segments for ", videoData.StreamerName, " failed because: ", err))
-		log.Println(mediapl.String())
 		return nil, err
 	}
 	vods.MuteMediaSegments(mediapl)
 	dwp.Dwp.MakePathsExplicit(mediapl)
-	mediaplBytes := mediapl.Encode().Bytes()
-	compressedBytes := make([]byte, len(mediaplBytes))
-	n, _, err := compressor.Compress(mediaplBytes, compressedBytes, libdeflate.ModeGzip)
+	return mediapl, nil
+}
+
+func getCompressedBytes(bytes []byte, compressor *libdeflate.Compressor) ([]byte, error) {
+	compressedBytes := make([]byte, len(bytes))
+	n, _, err := compressor.Compress(bytes, compressedBytes, libdeflate.ModeGzip)
 	if err != nil {
-		log.Println(fmt.Sprint("Compressing failed for ", videoData.StreamerName, " because: ", err))
 		return nil, err
 	}
 	compressedBytes = compressedBytes[:n]
 	return compressedBytes, nil
 }
 
+// Find the .m3u8 for a video and return the compressed bytes.
+func getVodCompressedBytes(ctx context.Context, videoData *vods.VideoData, compressor *libdeflate.Compressor) ([]byte, *vods.DomainWithPath, error) {
+	dwp, err := getFirstValidDwpResponse(ctx, videoData)
+	if err != nil {
+		log.Println(fmt.Sprint("Link was not found for ", videoData.StreamerName, " because: ", err))
+		return nil, nil, err
+	}
+	mediapl, err := getCleanedMediaPlaylistBytes(dwp)
+	if err != nil {
+		log.Println(fmt.Sprint("Removing nil segments for ", videoData.StreamerName, " failed because: ", err))
+		log.Println(mediapl.String())
+		return nil, nil, err
+	}
+	compressedBytes, err := getCompressedBytes(mediapl.Encode().Bytes(), compressor)
+	if err != nil {
+		log.Println(fmt.Sprint("Compressing failed for ", videoData.StreamerName, " because: ", err))
+		return nil, nil, err
+	}
+	return compressedBytes, dwp.Dwp, nil
+}
+
+type videoStatus struct {
+	seekPreviewsDomain sql.NullString
+	public             bool
+	subOnly            bool
+}
+
+func getVideoStatus(ctx context.Context, client graphql.Client, streamerId string, streamId string) (videoStatus, error) {
+	response, err := twitchgql.GetUserData(ctx, client, streamerId)
+	if err != nil {
+		return videoStatus{}, err
+	}
+	videos := response.User.Videos.Edges
+	public := false
+	var seekPreviewsDomain sql.NullString
+	for _, cur := range videos {
+		seekPreviewsUrl := cur.Node.SeekPreviewsURL
+		dwp, err := vods.UrlToDomainWithPath(seekPreviewsUrl)
+		if err != nil {
+			continue
+		}
+		if dwp.Path.VideoData.VideoId == streamId {
+			public = true
+			seekPreviewsDomain = sql.NullString{String: dwp.Domain, Valid: true}
+			break
+		}
+	}
+	subProducts := response.User.SubscriptionProducts
+	subOnly := len(subProducts) > 0 && subProducts[0].HasSubonlyVideoArchive
+	return videoStatus{
+		public:             public,
+		subOnly:            subOnly,
+		seekPreviewsDomain: seekPreviewsDomain,
+	}, nil
+}
+
 type hlsWorkerFetchCompressSendParams struct {
-	ctx                  context.Context
-	oldVodJobsCh         chan *LiveVod
-	hlsFetcherDelay      time.Duration
-	compressor           *libdeflate.Compressor
-	resultsCh            chan *VodResult
-	m3u8RequestTimeLimit time.Duration
+	ctx              context.Context
+	client           graphql.Client
+	oldVodJobsCh     chan *LiveVod
+	hlsFetcherDelay  time.Duration
+	compressor       *libdeflate.Compressor
+	resultsCh        chan *VodResult
+	requestTimeLimit time.Duration
 }
 
 func hlsWorkerFetchCompressSend(params hlsWorkerFetchCompressSendParams) {
@@ -318,15 +383,41 @@ func hlsWorkerFetchCompressSend(params hlsWorkerFetchCompressSendParams) {
 			return
 		case oldVod = <-params.oldVodJobsCh:
 		}
-		requestCtx, cancel := context.WithTimeout(params.ctx, params.m3u8RequestTimeLimit)
+		requestCtx, cancel := context.WithTimeout(params.ctx, params.requestTimeLimit)
 		requestInitiated := time.Now()
-		bytes, err := getVodCompressedBytes(requestCtx, oldVod.GetVideoData(), params.compressor)
+		bytes, dwp, err := getVodCompressedBytes(requestCtx, oldVod.GetVideoData(), params.compressor)
 		cancel()
 		var result *VodResult
 		if err != nil {
-			result = &VodResult{Vod: oldVod, HlsBytes: []byte{}, HlsBytesFound: false, RequestInitiated: requestInitiated}
+			result = &VodResult{
+				Vod:              oldVod,
+				HlsBytes:         nil,
+				HlsBytesFound:    false,
+				RequestInitiated: requestInitiated,
+				HlsDomain: sql.NullString{
+					String: "",
+					Valid:  false,
+				},
+			}
 		} else {
-			result = &VodResult{Vod: oldVod, HlsBytes: bytes, HlsBytesFound: true, RequestInitiated: requestInitiated}
+			result = &VodResult{
+				Vod:              oldVod,
+				HlsBytes:         bytes,
+				HlsBytesFound:    true,
+				RequestInitiated: requestInitiated,
+				HlsDomain: sql.NullString{
+					String: dwp.Domain,
+					Valid:  true,
+				},
+			}
+		}
+		requestCtx, cancel = context.WithTimeout(params.ctx, params.requestTimeLimit)
+		videoMeta, err := getVideoStatus(requestCtx, params.client, oldVod.StreamerId, oldVod.StreamId)
+		cancel()
+		if err == nil {
+			result.Public = sql.NullBool{Bool: videoMeta.public, Valid: true}
+			result.SeekPreviewsDomain = videoMeta.seekPreviewsDomain
+			result.SubOnly = sql.NullBool{Bool: videoMeta.subOnly, Valid: true}
 		}
 		select {
 		case <-params.ctx.Done():
@@ -413,12 +504,13 @@ func ScrapeTwitchLiveVodsWithGqlApi(params ScrapeTwitchLiveVodsWithGqlApiParams)
 			return err
 		}
 		go hlsWorkerFetchCompressSend(hlsWorkerFetchCompressSendParams{
-			ctx:                  ctx,
-			oldVodJobsCh:         oldVodJobsCh,
-			hlsFetcherDelay:      params.HlsFetcherDelay,
-			compressor:           &compressor,
-			resultsCh:            resultsCh,
-			m3u8RequestTimeLimit: params.RequestTimeLimit,
+			ctx:              ctx,
+			client:           client,
+			oldVodJobsCh:     oldVodJobsCh,
+			hlsFetcherDelay:  params.HlsFetcherDelay,
+			compressor:       &compressor,
+			resultsCh:        resultsCh,
+			requestTimeLimit: params.RequestTimeLimit,
 		})
 	}
 	go func() {
@@ -428,10 +520,14 @@ func ScrapeTwitchLiveVodsWithGqlApi(params ScrapeTwitchLiveVodsWithGqlApiParams)
 			log.Println(*result.Vod)
 			log.Println(fmt.Sprint("Gzipped size: ", len(result.HlsBytes)))
 			upsertRecordingParams := sqlvods.UpsertRecordingParams{
-				FetchedAt:    result.RequestInitiated,
-				GzippedBytes: result.HlsBytes,
-				StreamID:     result.Vod.StreamId,
-				BytesFound:   result.HlsBytesFound,
+				FetchedAt:          result.RequestInitiated,
+				GzippedBytes:       result.HlsBytes,
+				StreamID:           result.Vod.StreamId,
+				BytesFound:         result.HlsBytesFound,
+				HlsDomain:          result.HlsDomain,
+				SeekPreviewsDomain: result.SeekPreviewsDomain,
+				Public:             result.Public,
+				SubOnly:            result.SubOnly,
 			}
 			err := params.Queries.UpsertRecording(params.Ctx, upsertRecordingParams)
 			if err != nil {

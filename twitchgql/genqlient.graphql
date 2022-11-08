@@ -32,6 +32,7 @@ query GetStreams($first: Int!, $cursor: Cursor!) {
 
 fragment UserInfo on User {
   login
+  id
   lastBroadcast {
     id
     startedAt
@@ -77,5 +78,21 @@ query GetThreeUsers($user1: String!, $user2: String!, $user3: String!) {
   }
   user3: user(login: $user3) {
     ...UserInfo
+  }
+}
+
+query GetUserData($userId: ID!) {
+  user(id: $userId) {
+    videos(type: ARCHIVE, first: 3) {
+      edges {
+        node {
+          seekPreviewsURL
+          status
+        }
+      }
+    }
+    subscriptionProducts {
+      hasSubonlyVideoArchive
+    }
   }
 }

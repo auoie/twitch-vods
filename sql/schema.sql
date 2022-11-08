@@ -14,10 +14,14 @@ CREATE TABLE "streams" (
 -- CreateTable
 CREATE TABLE "recordings" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
-    "fetched_at" TIMESTAMP(3) NOT NULL,
-    "gzipped_bytes" BYTEA NOT NULL,
     "stream_id" TEXT NOT NULL,
+    "fetched_at" TIMESTAMP(3) NOT NULL,
+    "gzipped_bytes" BYTEA,
+    "hls_domain" TEXT,
     "bytes_found" BOOLEAN NOT NULL,
+    "public" BOOLEAN,
+    "sub_only" BOOLEAN,
+    "seek_previews_domain" TEXT,
 
     CONSTRAINT "recordings_pkey" PRIMARY KEY ("id")
 );

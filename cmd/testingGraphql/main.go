@@ -65,13 +65,15 @@ func threeUsersInformation(graphqlClient graphql.Client, user1, user2, user3 str
 		return err
 	}
 	print(response)
+	user1data, _ := twitchgql.GetUserData(context.Background(), graphqlClient, response.User1.Id)
+	print(user1data)
 	return nil
 }
 
 func main() {
 	fmt.Println("Running...")
 	graphqlClient := twitchgql.NewTwitchGqlClient()
-	err := threeUsersInformation(graphqlClient, "gmhikaru", "xqc", "malek_04")
+	err := threeUsersInformation(graphqlClient, "gmhikaru", "theo", "goonergooch")
 	if err != nil {
 		log.Fatal(err)
 	}

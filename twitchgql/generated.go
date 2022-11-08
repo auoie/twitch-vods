@@ -251,6 +251,9 @@ type GetThreeUsersUser1User struct {
 // GetLogin returns GetThreeUsersUser1User.Login, and is useful for accessing the field via an interface.
 func (v *GetThreeUsersUser1User) GetLogin() string { return v.UserInfo.Login }
 
+// GetId returns GetThreeUsersUser1User.Id, and is useful for accessing the field via an interface.
+func (v *GetThreeUsersUser1User) GetId() string { return v.UserInfo.Id }
+
 // GetLastBroadcast returns GetThreeUsersUser1User.LastBroadcast, and is useful for accessing the field via an interface.
 func (v *GetThreeUsersUser1User) GetLastBroadcast() UserInfoLastBroadcast {
 	return v.UserInfo.LastBroadcast
@@ -292,6 +295,8 @@ func (v *GetThreeUsersUser1User) UnmarshalJSON(b []byte) error {
 type __premarshalGetThreeUsersUser1User struct {
 	Login string `json:"login"`
 
+	Id string `json:"id"`
+
 	LastBroadcast UserInfoLastBroadcast `json:"lastBroadcast"`
 
 	Videos UserInfoVideosVideoConnection `json:"videos"`
@@ -311,6 +316,7 @@ func (v *GetThreeUsersUser1User) __premarshalJSON() (*__premarshalGetThreeUsersU
 	var retval __premarshalGetThreeUsersUser1User
 
 	retval.Login = v.UserInfo.Login
+	retval.Id = v.UserInfo.Id
 	retval.LastBroadcast = v.UserInfo.LastBroadcast
 	retval.Videos = v.UserInfo.Videos
 	retval.SubscriptionProducts = v.UserInfo.SubscriptionProducts
@@ -327,6 +333,9 @@ type GetThreeUsersUser2User struct {
 
 // GetLogin returns GetThreeUsersUser2User.Login, and is useful for accessing the field via an interface.
 func (v *GetThreeUsersUser2User) GetLogin() string { return v.UserInfo.Login }
+
+// GetId returns GetThreeUsersUser2User.Id, and is useful for accessing the field via an interface.
+func (v *GetThreeUsersUser2User) GetId() string { return v.UserInfo.Id }
 
 // GetLastBroadcast returns GetThreeUsersUser2User.LastBroadcast, and is useful for accessing the field via an interface.
 func (v *GetThreeUsersUser2User) GetLastBroadcast() UserInfoLastBroadcast {
@@ -369,6 +378,8 @@ func (v *GetThreeUsersUser2User) UnmarshalJSON(b []byte) error {
 type __premarshalGetThreeUsersUser2User struct {
 	Login string `json:"login"`
 
+	Id string `json:"id"`
+
 	LastBroadcast UserInfoLastBroadcast `json:"lastBroadcast"`
 
 	Videos UserInfoVideosVideoConnection `json:"videos"`
@@ -388,6 +399,7 @@ func (v *GetThreeUsersUser2User) __premarshalJSON() (*__premarshalGetThreeUsersU
 	var retval __premarshalGetThreeUsersUser2User
 
 	retval.Login = v.UserInfo.Login
+	retval.Id = v.UserInfo.Id
 	retval.LastBroadcast = v.UserInfo.LastBroadcast
 	retval.Videos = v.UserInfo.Videos
 	retval.SubscriptionProducts = v.UserInfo.SubscriptionProducts
@@ -404,6 +416,9 @@ type GetThreeUsersUser3User struct {
 
 // GetLogin returns GetThreeUsersUser3User.Login, and is useful for accessing the field via an interface.
 func (v *GetThreeUsersUser3User) GetLogin() string { return v.UserInfo.Login }
+
+// GetId returns GetThreeUsersUser3User.Id, and is useful for accessing the field via an interface.
+func (v *GetThreeUsersUser3User) GetId() string { return v.UserInfo.Id }
 
 // GetLastBroadcast returns GetThreeUsersUser3User.LastBroadcast, and is useful for accessing the field via an interface.
 func (v *GetThreeUsersUser3User) GetLastBroadcast() UserInfoLastBroadcast {
@@ -446,6 +461,8 @@ func (v *GetThreeUsersUser3User) UnmarshalJSON(b []byte) error {
 type __premarshalGetThreeUsersUser3User struct {
 	Login string `json:"login"`
 
+	Id string `json:"id"`
+
 	LastBroadcast UserInfoLastBroadcast `json:"lastBroadcast"`
 
 	Videos UserInfoVideosVideoConnection `json:"videos"`
@@ -465,10 +482,109 @@ func (v *GetThreeUsersUser3User) __premarshalJSON() (*__premarshalGetThreeUsersU
 	var retval __premarshalGetThreeUsersUser3User
 
 	retval.Login = v.UserInfo.Login
+	retval.Id = v.UserInfo.Id
 	retval.LastBroadcast = v.UserInfo.LastBroadcast
 	retval.Videos = v.UserInfo.Videos
 	retval.SubscriptionProducts = v.UserInfo.SubscriptionProducts
 	return &retval, nil
+}
+
+// GetUserDataResponse is returned by GetUserData on success.
+type GetUserDataResponse struct {
+	// Get a user by their ID or login.
+	// If no ID or login is provided, null is returned.
+	// Lookup type can tell the resolver to include all users (inclusing deleted and
+	// suspended accounts) on the lookup, defaults to only retrieve active users.
+	User GetUserDataUser `json:"user"`
+}
+
+// GetUser returns GetUserDataResponse.User, and is useful for accessing the field via an interface.
+func (v *GetUserDataResponse) GetUser() GetUserDataUser { return v.User }
+
+// GetUserDataUser includes the requested fields of the GraphQL type User.
+// The GraphQL type's documentation follows.
+//
+// Twitch user.
+type GetUserDataUser struct {
+	// A paginated list of videos for this user.
+	Videos GetUserDataUserVideosVideoConnection `json:"videos"`
+	// A list of subscription products available for purchase on the user's page.
+	SubscriptionProducts []GetUserDataUserSubscriptionProductsSubscriptionProduct `json:"subscriptionProducts"`
+}
+
+// GetVideos returns GetUserDataUser.Videos, and is useful for accessing the field via an interface.
+func (v *GetUserDataUser) GetVideos() GetUserDataUserVideosVideoConnection { return v.Videos }
+
+// GetSubscriptionProducts returns GetUserDataUser.SubscriptionProducts, and is useful for accessing the field via an interface.
+func (v *GetUserDataUser) GetSubscriptionProducts() []GetUserDataUserSubscriptionProductsSubscriptionProduct {
+	return v.SubscriptionProducts
+}
+
+// GetUserDataUserSubscriptionProductsSubscriptionProduct includes the requested fields of the GraphQL type SubscriptionProduct.
+// The GraphQL type's documentation follows.
+//
+// A subscription that is purchasable by users.
+// Once purchased, the subscription entitles the user to use special emote sets on Twitch.
+type GetUserDataUserSubscriptionProductsSubscriptionProduct struct {
+	// Whether the subscribers of this product are able to see the subs-only video archive.
+	HasSubonlyVideoArchive bool `json:"hasSubonlyVideoArchive"`
+}
+
+// GetHasSubonlyVideoArchive returns GetUserDataUserSubscriptionProductsSubscriptionProduct.HasSubonlyVideoArchive, and is useful for accessing the field via an interface.
+func (v *GetUserDataUserSubscriptionProductsSubscriptionProduct) GetHasSubonlyVideoArchive() bool {
+	return v.HasSubonlyVideoArchive
+}
+
+// GetUserDataUserVideosVideoConnection includes the requested fields of the GraphQL type VideoConnection.
+// The GraphQL type's documentation follows.
+//
+// A paginated list of videos, and its metadata.
+type GetUserDataUserVideosVideoConnection struct {
+	// The list of videos in this page.
+	Edges []GetUserDataUserVideosVideoConnectionEdgesVideoEdge `json:"edges"`
+}
+
+// GetEdges returns GetUserDataUserVideosVideoConnection.Edges, and is useful for accessing the field via an interface.
+func (v *GetUserDataUserVideosVideoConnection) GetEdges() []GetUserDataUserVideosVideoConnectionEdgesVideoEdge {
+	return v.Edges
+}
+
+// GetUserDataUserVideosVideoConnectionEdgesVideoEdge includes the requested fields of the GraphQL type VideoEdge.
+// The GraphQL type's documentation follows.
+//
+// An element in a paginated list of videos, and its metadata.
+type GetUserDataUserVideosVideoConnectionEdgesVideoEdge struct {
+	Node GetUserDataUserVideosVideoConnectionEdgesVideoEdgeNodeVideo `json:"node"`
+}
+
+// GetNode returns GetUserDataUserVideosVideoConnectionEdgesVideoEdge.Node, and is useful for accessing the field via an interface.
+func (v *GetUserDataUserVideosVideoConnectionEdgesVideoEdge) GetNode() GetUserDataUserVideosVideoConnectionEdgesVideoEdgeNodeVideo {
+	return v.Node
+}
+
+// GetUserDataUserVideosVideoConnectionEdgesVideoEdgeNodeVideo includes the requested fields of the GraphQL type Video.
+type GetUserDataUserVideosVideoConnectionEdgesVideoEdgeNodeVideo struct {
+	// A link to a sprite sheet image made up of preview thumbnails when seeking the video timeline.
+	SeekPreviewsURL string `json:"seekPreviewsURL"`
+	// When broadcastType is:
+	// - ARCHIVE: status goes from RECORDING to RECORDED.
+	// - HIGHLIGHT: status goes from UNPROCESSED to RECORDED.
+	// - UPLOAD: status goes from CREATED to UPLOADING, to PENDING_TRANSCODE, to RECORDED, or FAILED if anything goes wrong.
+	// - PREMIERE_UPLOAD: status goes from CREATED to UPLOADING, to
+	// PENDING_TRANSCODE, to RECORDED, or FAILED if anything goes wrong for this
+	// legacy broadcast type.
+	// - PAST_PREMIERE: status goes from RECORDING to RECORDED for this legacy broadcast type.
+	Status VideoStatus `json:"status"`
+}
+
+// GetSeekPreviewsURL returns GetUserDataUserVideosVideoConnectionEdgesVideoEdgeNodeVideo.SeekPreviewsURL, and is useful for accessing the field via an interface.
+func (v *GetUserDataUserVideosVideoConnectionEdgesVideoEdgeNodeVideo) GetSeekPreviewsURL() string {
+	return v.SeekPreviewsURL
+}
+
+// GetStatus returns GetUserDataUserVideosVideoConnectionEdgesVideoEdgeNodeVideo.Status, and is useful for accessing the field via an interface.
+func (v *GetUserDataUserVideosVideoConnectionEdgesVideoEdgeNodeVideo) GetStatus() VideoStatus {
+	return v.Status
 }
 
 // An enumeration of broadcaster languages.
@@ -566,6 +682,8 @@ const (
 type UserInfo struct {
 	// The user's standard alphanumeric Twitch name.
 	Login string `json:"login"`
+	// The user's unique identifier.
+	Id string `json:"id"`
 	// The user's last broadcast.
 	LastBroadcast UserInfoLastBroadcast `json:"lastBroadcast"`
 	// A paginated list of videos for this user.
@@ -576,6 +694,9 @@ type UserInfo struct {
 
 // GetLogin returns UserInfo.Login, and is useful for accessing the field via an interface.
 func (v *UserInfo) GetLogin() string { return v.Login }
+
+// GetId returns UserInfo.Id, and is useful for accessing the field via an interface.
+func (v *UserInfo) GetId() string { return v.Id }
 
 // GetLastBroadcast returns UserInfo.LastBroadcast, and is useful for accessing the field via an interface.
 func (v *UserInfo) GetLastBroadcast() UserInfoLastBroadcast { return v.LastBroadcast }
@@ -855,6 +976,14 @@ func (v *__GetThreeUsersInput) GetUser2() string { return v.User2 }
 // GetUser3 returns __GetThreeUsersInput.User3, and is useful for accessing the field via an interface.
 func (v *__GetThreeUsersInput) GetUser3() string { return v.User3 }
 
+// __GetUserDataInput is used internally by genqlient
+type __GetUserDataInput struct {
+	UserId string `json:"userId"`
+}
+
+// GetUserId returns __GetUserDataInput.UserId, and is useful for accessing the field via an interface.
+func (v *__GetUserDataInput) GetUserId() string { return v.UserId }
+
 // first must be between 1 and 30.
 // cursor is not included in the result.
 func GetStreams(
@@ -938,6 +1067,7 @@ query GetThreeUsers ($user1: String!, $user2: String!, $user3: String!) {
 }
 fragment UserInfo on User {
 	login
+	id
 	lastBroadcast {
 		id
 		startedAt
@@ -983,6 +1113,48 @@ fragment UserInfo on User {
 	var err error
 
 	var data GetThreeUsersResponse
+	resp := &graphql.Response{Data: &data}
+
+	err = client.MakeRequest(
+		ctx,
+		req,
+		resp,
+	)
+
+	return &data, err
+}
+
+func GetUserData(
+	ctx context.Context,
+	client graphql.Client,
+	userId string,
+) (*GetUserDataResponse, error) {
+	req := &graphql.Request{
+		OpName: "GetUserData",
+		Query: `
+query GetUserData ($userId: ID!) {
+	user(id: $userId) {
+		videos(type: ARCHIVE, first: 3) {
+			edges {
+				node {
+					seekPreviewsURL
+					status
+				}
+			}
+		}
+		subscriptionProducts {
+			hasSubonlyVideoArchive
+		}
+	}
+}
+`,
+		Variables: &__GetUserDataInput{
+			UserId: userId,
+		},
+	}
+	var err error
+
+	var data GetUserDataResponse
 	resp := &graphql.Response{Data: &data}
 
 	err = client.MakeRequest(

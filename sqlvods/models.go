@@ -5,17 +5,22 @@
 package sqlvods
 
 import (
+	"database/sql"
 	"time"
 
 	"github.com/google/uuid"
 )
 
 type Recording struct {
-	ID           uuid.UUID
-	FetchedAt    time.Time
-	GzippedBytes []byte
-	StreamID     string
-	BytesFound   bool
+	ID                 uuid.UUID
+	StreamID           string
+	FetchedAt          time.Time
+	GzippedBytes       []byte
+	HlsDomain          sql.NullString
+	BytesFound         bool
+	Public             sql.NullBool
+	SubOnly            sql.NullBool
+	SeekPreviewsDomain sql.NullString
 }
 
 type Stream struct {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log"
 	"os"
@@ -148,9 +149,18 @@ func main() {
 	log.Println(len(everything))
 	log.Print()
 
-	logFatalOnError(queries.UpsertRecording(context.Background(), sqlvods.UpsertRecordingParams{FetchedAt: time.Now(), GzippedBytes: []byte{}, StreamID: streams[0].StreamID, BytesFound: false}))
+	logFatalOnError(queries.UpsertRecording(context.Background(), sqlvods.UpsertRecordingParams{
+		FetchedAt:    time.Now(),
+		GzippedBytes: nil,
+		StreamID:     streams[0].StreamID,
+		BytesFound:   false,
+		Public:       sql.NullBool{Bool: true, Valid: false},
+		SubOnly:      sql.NullBool{Bool: false, Valid: false},
+	}))
 	everything, err = queries.GetEverything(context.Background())
 	logFatalOnError(err)
+	log.Println(streams[0].StreamID)
+	log.Println("hello")
 	log.Println(everything)
 	log.Println(len(everything))
 	log.Print()

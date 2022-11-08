@@ -139,16 +139,20 @@ WHERE
 
 -- name: UpsertRecording :exec
 INSERT INTO
-  recordings (fetched_at, gzipped_bytes, stream_id, bytes_found)
+  recordings (stream_id, fetched_at, hls_domain, gzipped_bytes, bytes_found, seek_previews_domain, public, sub_only)
 VALUES
-  ($1, $2, $3, $4)
+  ($1, $2, $3, $4, $5, $6, $7, $8)
 ON CONFLICT
   (stream_id)
 DO
   UPDATE SET
     fetched_at = EXCLUDED.fetched_at,
+    hls_domain = EXCLUDED.hls_domain,
     gzipped_bytes = EXCLUDED.gzipped_bytes,
-    bytes_found = EXCLUDED.bytes_found;
+    bytes_found = EXCLUDED.bytes_found,
+    seek_previews_domain = EXCLUDED.seek_previews_domain,
+    public = EXCLUDED.public,
+    sub_only = EXCLUDED.sub_only;
 
 -- name: GetEverything :many
 SELECT
