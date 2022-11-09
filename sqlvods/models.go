@@ -31,4 +31,7 @@ type Stream struct {
 	MaxViews             int64
 	LastUpdatedAt        time.Time
 	StreamerLoginAtStart string
+	LanguageAtStart      string
+	TitleAtStart         string
+	GameNameAtStart      string
 }

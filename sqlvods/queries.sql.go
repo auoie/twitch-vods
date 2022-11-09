@@ -61,7 +61,7 @@ func (q *Queries) DeleteStreams(ctx context.Context) error {
 
 const getEverything = `-- name: GetEverything :many
 SELECT
-  s.id, streamer_id, s.stream_id, start_time, max_views, last_updated_at, streamer_login_at_start, r.id, r.stream_id, fetched_at, gzipped_bytes, hls_domain, bytes_found, public, sub_only, seek_previews_domain
+  s.id, streamer_id, s.stream_id, start_time, max_views, last_updated_at, streamer_login_at_start, language_at_start, title_at_start, game_name_at_start, r.id, r.stream_id, fetched_at, gzipped_bytes, hls_domain, bytes_found, public, sub_only, seek_previews_domain
 FROM
   streams s
 LEFT JOIN
@@ -78,6 +78,9 @@ type GetEverythingRow struct {
 	MaxViews             int64
 	LastUpdatedAt        time.Time
 	StreamerLoginAtStart string
+	LanguageAtStart      string
+	TitleAtStart         string
+	GameNameAtStart      string
 	ID_2                 uuid.NullUUID
 	StreamID_2           sql.NullString
 	FetchedAt            sql.NullTime
@@ -106,6 +109,9 @@ func (q *Queries) GetEverything(ctx context.Context) ([]GetEverythingRow, error)
 			&i.MaxViews,
 			&i.LastUpdatedAt,
 			&i.StreamerLoginAtStart,
+			&i.LanguageAtStart,
+			&i.TitleAtStart,
+			&i.GameNameAtStart,
 			&i.ID_2,
 			&i.StreamID_2,
 			&i.FetchedAt,
@@ -499,14 +505,17 @@ func (q *Queries) UpdateStream(ctx context.Context, arg UpdateStreamParams) erro
 
 const upsertManyStreams = `-- name: UpsertManyStreams :exec
 INSERT INTO
-  streams (last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start)
+  streams (last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start)
 SELECT
   unnest($1::TIMESTAMP(3)[]) AS last_updated_at,
   unnest($2::BIGINT[]) AS max_views,
   unnest($3::TIMESTAMP(3)[]) AS start_time,
   unnest($4::TEXT[]) AS streamer_id,
   unnest($5::TEXT[]) AS stream_id,
-  unnest($6::TEXT[]) AS streamer_login_at_start
+  unnest($6::TEXT[]) AS streamer_login_at_start,
+  unnest($7::TEXT[]) AS game_name_at_start,
+  unnest($8::TEXT[]) AS language_at_start,
+  unnest($9::TEXT[]) AS title_at_start
 ON CONFLICT
   (stream_id)
 DO
@@ -522,6 +531,9 @@ type UpsertManyStreamsParams struct {
 	StreamerIDArr           []string
 	StreamIDArr             []string
 	StreamerLoginAtStartArr []string
+	GameNameAtStartArr      []string
+	LanguageAtStartArr      []string
+	TitleAtStartArr         []string
 }
 
 func (q *Queries) UpsertManyStreams(ctx context.Context, arg UpsertManyStreamsParams) error {
@@ -532,6 +544,9 @@ func (q *Queries) UpsertManyStreams(ctx context.Context, arg UpsertManyStreamsPa
 		arg.StreamerIDArr,
 		arg.StreamIDArr,
 		arg.StreamerLoginAtStartArr,
+		arg.GameNameAtStartArr,
+		arg.LanguageAtStartArr,
+		arg.TitleAtStartArr,
 	)
 	return err
 }

@@ -259,6 +259,11 @@ func (v *GetThreeUsersUser1User) GetLastBroadcast() UserInfoLastBroadcast {
 	return v.UserInfo.LastBroadcast
 }
 
+// GetBroadcastSettings returns GetThreeUsersUser1User.BroadcastSettings, and is useful for accessing the field via an interface.
+func (v *GetThreeUsersUser1User) GetBroadcastSettings() UserInfoBroadcastSettings {
+	return v.UserInfo.BroadcastSettings
+}
+
 // GetVideos returns GetThreeUsersUser1User.Videos, and is useful for accessing the field via an interface.
 func (v *GetThreeUsersUser1User) GetVideos() UserInfoVideosVideoConnection { return v.UserInfo.Videos }
 
@@ -299,6 +304,8 @@ type __premarshalGetThreeUsersUser1User struct {
 
 	LastBroadcast UserInfoLastBroadcast `json:"lastBroadcast"`
 
+	BroadcastSettings UserInfoBroadcastSettings `json:"broadcastSettings"`
+
 	Videos UserInfoVideosVideoConnection `json:"videos"`
 
 	SubscriptionProducts []UserInfoSubscriptionProductsSubscriptionProduct `json:"subscriptionProducts"`
@@ -318,6 +325,7 @@ func (v *GetThreeUsersUser1User) __premarshalJSON() (*__premarshalGetThreeUsersU
 	retval.Login = v.UserInfo.Login
 	retval.Id = v.UserInfo.Id
 	retval.LastBroadcast = v.UserInfo.LastBroadcast
+	retval.BroadcastSettings = v.UserInfo.BroadcastSettings
 	retval.Videos = v.UserInfo.Videos
 	retval.SubscriptionProducts = v.UserInfo.SubscriptionProducts
 	return &retval, nil
@@ -340,6 +348,11 @@ func (v *GetThreeUsersUser2User) GetId() string { return v.UserInfo.Id }
 // GetLastBroadcast returns GetThreeUsersUser2User.LastBroadcast, and is useful for accessing the field via an interface.
 func (v *GetThreeUsersUser2User) GetLastBroadcast() UserInfoLastBroadcast {
 	return v.UserInfo.LastBroadcast
+}
+
+// GetBroadcastSettings returns GetThreeUsersUser2User.BroadcastSettings, and is useful for accessing the field via an interface.
+func (v *GetThreeUsersUser2User) GetBroadcastSettings() UserInfoBroadcastSettings {
+	return v.UserInfo.BroadcastSettings
 }
 
 // GetVideos returns GetThreeUsersUser2User.Videos, and is useful for accessing the field via an interface.
@@ -382,6 +395,8 @@ type __premarshalGetThreeUsersUser2User struct {
 
 	LastBroadcast UserInfoLastBroadcast `json:"lastBroadcast"`
 
+	BroadcastSettings UserInfoBroadcastSettings `json:"broadcastSettings"`
+
 	Videos UserInfoVideosVideoConnection `json:"videos"`
 
 	SubscriptionProducts []UserInfoSubscriptionProductsSubscriptionProduct `json:"subscriptionProducts"`
@@ -401,6 +416,7 @@ func (v *GetThreeUsersUser2User) __premarshalJSON() (*__premarshalGetThreeUsersU
 	retval.Login = v.UserInfo.Login
 	retval.Id = v.UserInfo.Id
 	retval.LastBroadcast = v.UserInfo.LastBroadcast
+	retval.BroadcastSettings = v.UserInfo.BroadcastSettings
 	retval.Videos = v.UserInfo.Videos
 	retval.SubscriptionProducts = v.UserInfo.SubscriptionProducts
 	return &retval, nil
@@ -423,6 +439,11 @@ func (v *GetThreeUsersUser3User) GetId() string { return v.UserInfo.Id }
 // GetLastBroadcast returns GetThreeUsersUser3User.LastBroadcast, and is useful for accessing the field via an interface.
 func (v *GetThreeUsersUser3User) GetLastBroadcast() UserInfoLastBroadcast {
 	return v.UserInfo.LastBroadcast
+}
+
+// GetBroadcastSettings returns GetThreeUsersUser3User.BroadcastSettings, and is useful for accessing the field via an interface.
+func (v *GetThreeUsersUser3User) GetBroadcastSettings() UserInfoBroadcastSettings {
+	return v.UserInfo.BroadcastSettings
 }
 
 // GetVideos returns GetThreeUsersUser3User.Videos, and is useful for accessing the field via an interface.
@@ -465,6 +486,8 @@ type __premarshalGetThreeUsersUser3User struct {
 
 	LastBroadcast UserInfoLastBroadcast `json:"lastBroadcast"`
 
+	BroadcastSettings UserInfoBroadcastSettings `json:"broadcastSettings"`
+
 	Videos UserInfoVideosVideoConnection `json:"videos"`
 
 	SubscriptionProducts []UserInfoSubscriptionProductsSubscriptionProduct `json:"subscriptionProducts"`
@@ -484,6 +507,7 @@ func (v *GetThreeUsersUser3User) __premarshalJSON() (*__premarshalGetThreeUsersU
 	retval.Login = v.UserInfo.Login
 	retval.Id = v.UserInfo.Id
 	retval.LastBroadcast = v.UserInfo.LastBroadcast
+	retval.BroadcastSettings = v.UserInfo.BroadcastSettings
 	retval.Videos = v.UserInfo.Videos
 	retval.SubscriptionProducts = v.UserInfo.SubscriptionProducts
 	return &retval, nil
@@ -686,6 +710,8 @@ type UserInfo struct {
 	Id string `json:"id"`
 	// The user's last broadcast.
 	LastBroadcast UserInfoLastBroadcast `json:"lastBroadcast"`
+	// A User's broadcast settings that persists between streams.
+	BroadcastSettings UserInfoBroadcastSettings `json:"broadcastSettings"`
 	// A paginated list of videos for this user.
 	Videos UserInfoVideosVideoConnection `json:"videos"`
 	// A list of subscription products available for purchase on the user's page.
@@ -701,6 +727,9 @@ func (v *UserInfo) GetId() string { return v.Id }
 // GetLastBroadcast returns UserInfo.LastBroadcast, and is useful for accessing the field via an interface.
 func (v *UserInfo) GetLastBroadcast() UserInfoLastBroadcast { return v.LastBroadcast }
 
+// GetBroadcastSettings returns UserInfo.BroadcastSettings, and is useful for accessing the field via an interface.
+func (v *UserInfo) GetBroadcastSettings() UserInfoBroadcastSettings { return v.BroadcastSettings }
+
 // GetVideos returns UserInfo.Videos, and is useful for accessing the field via an interface.
 func (v *UserInfo) GetVideos() UserInfoVideosVideoConnection { return v.Videos }
 
@@ -708,6 +737,29 @@ func (v *UserInfo) GetVideos() UserInfoVideosVideoConnection { return v.Videos }
 func (v *UserInfo) GetSubscriptionProducts() []UserInfoSubscriptionProductsSubscriptionProduct {
 	return v.SubscriptionProducts
 }
+
+// UserInfoBroadcastSettings includes the requested fields of the GraphQL type BroadcastSettings.
+// The GraphQL type's documentation follows.
+//
+// Settings for a User's broadcast that persist between streams.
+type UserInfoBroadcastSettings struct {
+	// A flag indicating if the user's broadcast is intended for mature audiences only.
+	IsMature bool `json:"isMature"`
+	// The primary language that the user has configured for their broadcasts. The
+	// default value is "", when the user has not indicated a primary language.
+	Language Language `json:"language"`
+	// The title of the user's broadcast. The default value is "", when the user has not indicated a title.
+	Title string `json:"title"`
+}
+
+// GetIsMature returns UserInfoBroadcastSettings.IsMature, and is useful for accessing the field via an interface.
+func (v *UserInfoBroadcastSettings) GetIsMature() bool { return v.IsMature }
+
+// GetLanguage returns UserInfoBroadcastSettings.Language, and is useful for accessing the field via an interface.
+func (v *UserInfoBroadcastSettings) GetLanguage() Language { return v.Language }
+
+// GetTitle returns UserInfoBroadcastSettings.Title, and is useful for accessing the field via an interface.
+func (v *UserInfoBroadcastSettings) GetTitle() string { return v.Title }
 
 // UserInfoLastBroadcast includes the requested fields of the GraphQL type Broadcast.
 // The GraphQL type's documentation follows.
@@ -736,10 +788,23 @@ func (v *UserInfoLastBroadcast) GetGame() UserInfoLastBroadcastGame { return v.G
 //
 // A Game is often the subject of a Stream on Twitch.
 type UserInfoLastBroadcastGame struct {
+	// The game's unique Twitch identifier.
+	// It is used to associate games with product offers.
+	Id string `json:"id"`
+	// The name of the game. This string is untranslated.
+	// This field should only be used in limited occassions, like tracking and URLs.
+	// You should use displayName for all all game names shown to the users.
+	Name string `json:"name"`
 	// The translated game name used for display purposes.
 	// Use name for tracking props or URLs.
 	DisplayName string `json:"displayName"`
 }
+
+// GetId returns UserInfoLastBroadcastGame.Id, and is useful for accessing the field via an interface.
+func (v *UserInfoLastBroadcastGame) GetId() string { return v.Id }
+
+// GetName returns UserInfoLastBroadcastGame.Name, and is useful for accessing the field via an interface.
+func (v *UserInfoLastBroadcastGame) GetName() string { return v.Name }
 
 // GetDisplayName returns UserInfoLastBroadcastGame.DisplayName, and is useful for accessing the field via an interface.
 func (v *UserInfoLastBroadcastGame) GetDisplayName() string { return v.DisplayName }
@@ -829,6 +894,8 @@ type UserInfoVideosVideoConnectionEdgesVideoEdgeNodeVideo struct {
 	RecordedAt time.Time `json:"recordedAt"`
 	// Either PRIVATE or PUBLIC.
 	Scope VideoPrivacyScope `json:"scope"`
+	// The game the video is depicting.
+	Game UserInfoVideosVideoConnectionEdgesVideoEdgeNodeVideoGame `json:"game"`
 	// A link to a sprite sheet image made up of preview thumbnails when seeking the video timeline.
 	SeekPreviewsURL string `json:"seekPreviewsURL"`
 	// The type of broadcast the video originated from.
@@ -885,6 +952,11 @@ func (v *UserInfoVideosVideoConnectionEdgesVideoEdgeNodeVideo) GetScope() VideoP
 	return v.Scope
 }
 
+// GetGame returns UserInfoVideosVideoConnectionEdgesVideoEdgeNodeVideo.Game, and is useful for accessing the field via an interface.
+func (v *UserInfoVideosVideoConnectionEdgesVideoEdgeNodeVideo) GetGame() UserInfoVideosVideoConnectionEdgesVideoEdgeNodeVideoGame {
+	return v.Game
+}
+
 // GetSeekPreviewsURL returns UserInfoVideosVideoConnectionEdgesVideoEdgeNodeVideo.SeekPreviewsURL, and is useful for accessing the field via an interface.
 func (v *UserInfoVideosVideoConnectionEdgesVideoEdgeNodeVideo) GetSeekPreviewsURL() string {
 	return v.SeekPreviewsURL
@@ -917,6 +989,26 @@ func (v *UserInfoVideosVideoConnectionEdgesVideoEdgeNodeVideo) GetDeletedAt() ti
 
 // GetViewCount returns UserInfoVideosVideoConnectionEdgesVideoEdgeNodeVideo.ViewCount, and is useful for accessing the field via an interface.
 func (v *UserInfoVideosVideoConnectionEdgesVideoEdgeNodeVideo) GetViewCount() int { return v.ViewCount }
+
+// UserInfoVideosVideoConnectionEdgesVideoEdgeNodeVideoGame includes the requested fields of the GraphQL type Game.
+// The GraphQL type's documentation follows.
+//
+// A Game is often the subject of a Stream on Twitch.
+type UserInfoVideosVideoConnectionEdgesVideoEdgeNodeVideoGame struct {
+	// The game's unique Twitch identifier.
+	// It is used to associate games with product offers.
+	Id string `json:"id"`
+	// The name of the game. This string is untranslated.
+	// This field should only be used in limited occassions, like tracking and URLs.
+	// You should use displayName for all all game names shown to the users.
+	Name string `json:"name"`
+}
+
+// GetId returns UserInfoVideosVideoConnectionEdgesVideoEdgeNodeVideoGame.Id, and is useful for accessing the field via an interface.
+func (v *UserInfoVideosVideoConnectionEdgesVideoEdgeNodeVideoGame) GetId() string { return v.Id }
+
+// GetName returns UserInfoVideosVideoConnectionEdgesVideoEdgeNodeVideoGame.Name, and is useful for accessing the field via an interface.
+func (v *UserInfoVideosVideoConnectionEdgesVideoEdgeNodeVideoGame) GetName() string { return v.Name }
 
 type VideoPrivacyScope string
 
@@ -1072,8 +1164,15 @@ fragment UserInfo on User {
 		id
 		startedAt
 		game {
+			id
+			name
 			displayName
 		}
+	}
+	broadcastSettings {
+		isMature
+		language
+		title
 	}
 	videos(type: ARCHIVE, options: {includePrivate:false}, first: 3) {
 		edges {
@@ -1085,6 +1184,10 @@ fragment UserInfo on User {
 				publishedAt
 				recordedAt
 				scope
+				game {
+					id
+					name
+				}
 				seekPreviewsURL
 				broadcastType
 				status

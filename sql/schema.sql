@@ -7,6 +7,9 @@ CREATE TABLE "streams" (
     "max_views" BIGINT NOT NULL,
     "last_updated_at" TIMESTAMP(3) NOT NULL,
     "streamer_login_at_start" TEXT NOT NULL,
+    "language_at_start" TEXT NOT NULL,
+    "title_at_start" TEXT NOT NULL,
+    "game_name_at_start" TEXT NOT NULL,
 
     CONSTRAINT "streams_pkey" PRIMARY KEY ("id")
 );

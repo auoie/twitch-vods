@@ -11,6 +11,9 @@ model streams {
   max_views               BigInt
   last_updated_at         DateTime
   streamer_login_at_start String
+  language_at_start       String
+  title_at_start          String
+  game_name_at_start      String
   recordings              recordings?
 
   @@index([streamer_id, start_time(sort: Desc)])

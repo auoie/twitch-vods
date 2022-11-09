@@ -71,14 +71,17 @@ DO
 
 -- name: UpsertManyStreams :exec
 INSERT INTO
-  streams (last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start)
+  streams (last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start)
 SELECT
   unnest(@last_updated_at_arr::TIMESTAMP(3)[]) AS last_updated_at,
   unnest(@max_views_arr::BIGINT[]) AS max_views,
   unnest(@start_time_arr::TIMESTAMP(3)[]) AS start_time,
   unnest(@streamer_id_arr::TEXT[]) AS streamer_id,
   unnest(@stream_id_arr::TEXT[]) AS stream_id,
-  unnest(@streamer_login_at_start_arr::TEXT[]) AS streamer_login_at_start
+  unnest(@streamer_login_at_start_arr::TEXT[]) AS streamer_login_at_start,
+  unnest(@game_name_at_start_arr::TEXT[]) AS game_name_at_start,
+  unnest(@language_at_start_arr::TEXT[]) AS language_at_start,
+  unnest(@title_at_start_arr::TEXT[]) AS title_at_start
 ON CONFLICT
   (stream_id)
 DO

@@ -37,8 +37,15 @@ fragment UserInfo on User {
     id
     startedAt
     game {
+      id
+      name
       displayName
     }
+  }
+  broadcastSettings {
+    isMature
+    language
+    title
   }
   videos(type: ARCHIVE, options: { includePrivate: false }, first: 3) {
     edges {
@@ -50,6 +57,10 @@ fragment UserInfo on User {
         publishedAt
         recordedAt
         scope
+        game {
+          id
+          name
+        }
         seekPreviewsURL
         broadcastType
         status
