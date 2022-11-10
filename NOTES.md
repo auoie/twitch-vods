@@ -236,3 +236,4 @@ I should not trust the graphql API to work all the time.
 - Add some private API so that I can configure the client ID and set of cloudfront domains at runtime.
   Maybe put these in a database so that I can retrieve them if the program restarts.
   Maybe have some additional service that monitors for client id and cloudfront domains to periodically update the database.
+- Maybe update the list of domains with the domains retrieved via graphql and persist this to DB
