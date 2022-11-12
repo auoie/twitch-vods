@@ -523,17 +523,17 @@ func ScrapeTwitchLiveVodsWithGqlApi(params ScrapeTwitchLiveVodsWithGqlApiParams)
 			log.Println("Result was logged:")
 			log.Println(*result.Vod)
 			log.Println(fmt.Sprint("Gzipped size: ", len(result.HlsBytes)))
-			upsertRecordingParams := sqlvods.UpsertRecordingParams{
-				FetchedAt:          result.RequestInitiated,
+			upsertRecordingParams := sqlvods.UpdateRecordingParams{
+				RecordingFetchedAt: sql.NullTime{Time: result.RequestInitiated, Valid: true},
 				GzippedBytes:       result.HlsBytes,
 				StreamID:           result.Vod.StreamId,
-				BytesFound:         result.HlsBytesFound,
+				BytesFound:         sql.NullBool{Bool: result.HlsBytesFound, Valid: true},
 				HlsDomain:          result.HlsDomain,
 				SeekPreviewsDomain: result.SeekPreviewsDomain,
 				Public:             result.Public,
 				SubOnly:            result.SubOnly,
 			}
-			err := params.Queries.UpsertRecording(params.Ctx, upsertRecordingParams)
+			err := params.Queries.UpdateRecording(params.Ctx, upsertRecordingParams)
 			if err != nil {
 				log.Println(fmt.Sprint("upserting recording failed: ", err))
 				break

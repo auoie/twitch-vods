@@ -73,6 +73,9 @@ func getUpsertManyStreamsParams(streams []scraper.LiveVod) sqlvods.UpsertManyStr
 		result.StreamIDArr = append(result.StreamIDArr, stream.StreamId)
 		result.StreamerIDArr = append(result.StreamerIDArr, stream.StreamerId)
 		result.StreamerLoginAtStartArr = append(result.StreamerLoginAtStartArr, stream.StreamerLoginAtStart)
+		result.LanguageAtStartArr = append(result.LanguageAtStartArr, "EN")
+		result.TitleAtStartArr = append(result.TitleAtStartArr, "title")
+		result.GameNameAtStartArr = append(result.GameNameAtStartArr, "game")
 	}
 	return result
 }
@@ -120,6 +123,7 @@ func main() {
 	logFatalOnError(queries.UpsertManyStreams(context.Background(), getUpsertManyStreamsParams(streams3)))
 	everything, err = queries.GetEverything(context.Background())
 	logFatalOnError(err)
+	log.Println("upserted many streams")
 	log.Println(everything)
 	log.Println(len(everything))
 	log.Print()
@@ -138,24 +142,34 @@ func main() {
 	log.Println(len(streams))
 	log.Print()
 
-	err = queries.UpsertRecording(context.Background(), sqlvods.UpsertRecordingParams{FetchedAt: time.Now(), GzippedBytes: []byte{'a', 'b', 'c'}, StreamID: "lskdjfslkjf", BytesFound: true})
+	err = queries.UpdateRecording(context.Background(), sqlvods.UpdateRecordingParams{
+		GzippedBytes:       []byte{'a', 'b', 'c'},
+		StreamID:           "lskdjfslkjf",
+		BytesFound:         sql.NullBool{Bool: true, Valid: true},
+		RecordingFetchedAt: sql.NullTime{Time: time.Now(), Valid: true}})
+	log.Println("upserted recording with invalid stream id")
 	log.Println(err)
 	log.Print()
 
-	logFatalOnError(queries.UpsertRecording(context.Background(), sqlvods.UpsertRecordingParams{FetchedAt: time.Now(), GzippedBytes: []byte{'a', 'b', 'c'}, StreamID: streams[0].StreamID, BytesFound: true}))
+	log.Println(streams[0].StreamID)
+	logFatalOnError(queries.UpdateRecording(context.Background(), sqlvods.UpdateRecordingParams{
+		RecordingFetchedAt: sql.NullTime{Time: time.Now(), Valid: true},
+		GzippedBytes:       []byte{'a', 'b', 'c'},
+		StreamID:           streams[0].StreamID,
+		BytesFound:         sql.NullBool{Bool: true, Valid: true}}))
 	everything, err = queries.GetEverything(context.Background())
 	logFatalOnError(err)
 	log.Println(everything)
 	log.Println(len(everything))
 	log.Print()
 
-	logFatalOnError(queries.UpsertRecording(context.Background(), sqlvods.UpsertRecordingParams{
-		FetchedAt:    time.Now(),
-		GzippedBytes: nil,
-		StreamID:     streams[0].StreamID,
-		BytesFound:   false,
-		Public:       sql.NullBool{Bool: true, Valid: false},
-		SubOnly:      sql.NullBool{Bool: false, Valid: false},
+	logFatalOnError(queries.UpdateRecording(context.Background(), sqlvods.UpdateRecordingParams{
+		RecordingFetchedAt: sql.NullTime{Time: time.Now(), Valid: true},
+		GzippedBytes:       nil,
+		StreamID:           streams[0].StreamID,
+		BytesFound:         sql.NullBool{Bool: false, Valid: true},
+		Public:             sql.NullBool{Bool: true, Valid: false},
+		SubOnly:            sql.NullBool{Bool: false, Valid: false},
 	}))
 	everything, err = queries.GetEverything(context.Background())
 	logFatalOnError(err)

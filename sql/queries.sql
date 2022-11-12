@@ -43,20 +43,6 @@ LEFT JOIN
 ON
   ids.stream_id = streams.stream_id; 
 
--- name: AddStream :exec
-INSERT INTO
-  streams (last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start)
-VALUES
-  ($1, $2, $3, $4, $5, $6);
-
--- name: UpdateStream :exec
-UPDATE
-  streams 
-SET
-  last_updated_at = $1, max_views = $2
-WHERE
-  stream_id = $1;
-
 -- name: UpsertStream :exec
 INSERT INTO
   streams (last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start)
@@ -128,44 +114,25 @@ ORDER BY
   start_time DESC
 LIMIT $1;
 
--- name: GetLatestStreamAndRecordingFromStreamId :one
-SELECT
-  s.id, s.last_updated_at, s.max_views, s.start_time, s.streamer_id, s.stream_id, s.streamer_login_at_start, r.id, r.fetched_at, r.gzipped_bytes
-FROM 
-  streams s
-LEFT JOIN
-  recordings r
-ON
-  s.stream_id = r.stream_id
+-- name: UpdateRecording :exec
+UPDATE
+  streams
+SET
+  recording_fetched_at = $2,
+  hls_domain = $3,
+  gzipped_bytes = $4,
+  bytes_found = $5,
+  seek_previews_domain = $6,
+  public = $7,
+  sub_only = $8
 WHERE
-  s.stream_id = $1;
-
--- name: UpsertRecording :exec
-INSERT INTO
-  recordings (stream_id, fetched_at, hls_domain, gzipped_bytes, bytes_found, seek_previews_domain, public, sub_only)
-VALUES
-  ($1, $2, $3, $4, $5, $6, $7, $8)
-ON CONFLICT
-  (stream_id)
-DO
-  UPDATE SET
-    fetched_at = EXCLUDED.fetched_at,
-    hls_domain = EXCLUDED.hls_domain,
-    gzipped_bytes = EXCLUDED.gzipped_bytes,
-    bytes_found = EXCLUDED.bytes_found,
-    seek_previews_domain = EXCLUDED.seek_previews_domain,
-    public = EXCLUDED.public,
-    sub_only = EXCLUDED.sub_only;
+  stream_id = $1;
 
 -- name: GetEverything :many
 SELECT
   *
 FROM
-  streams s
-LEFT JOIN
-  recordings r
-ON
-  s.stream_id = r.stream_id;
+  streams s;
 
 -- name: DeleteStreams :exec
 DELETE FROM streams;

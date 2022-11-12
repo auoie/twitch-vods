@@ -228,6 +228,7 @@ I should not trust the graphql API to work all the time.
 
 ## TODO
 
+- Change database to store everything in the main streams table
 - Populate the live VODs queue using the database when the program restarts.
 - Use exponential backoff in the case where a connection cannot be established
 - Make a way to evict the gzipped bytes every 60 days. Decide whether I should keep the recording or not.
