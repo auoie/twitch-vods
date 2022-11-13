@@ -13,6 +13,8 @@ import (
 	"github.com/auoie/goVods/twitchgql"
 	"github.com/auoie/goVods/vods"
 	"github.com/grafov/m3u8"
+	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/jdvr/go-again"
 )
 
 type VodDataPoint struct {
@@ -69,6 +71,7 @@ func edgeNodesMatchingAndNonEmpty(
 
 type fetchTwitchGqlForeverParams struct {
 	ctx                       context.Context
+	initialLiveVodQueue       *liveVodsPriorityQueue
 	client                    graphql.Client
 	twitchGqlRequestTimeLimit time.Duration
 	twitchGqlFetcherDelay     time.Duration
@@ -106,7 +109,7 @@ func twitchGqlResponseToSqlParams(
 func fetchTwitchGqlForever(params fetchTwitchGqlForeverParams) {
 	log.Println("Inside fetchTwitchGqlForever...")
 	log.Println(fmt.Sprint("Fetcher delay: ", params.twitchGqlFetcherDelay))
-	liveVodQueue := CreateNewLiveVodsPriorityQueue()
+	liveVodQueue := params.initialLiveVodQueue
 	twitchGqlTicker := time.NewTicker(params.twitchGqlFetcherDelay)
 	defer twitchGqlTicker.Stop()
 	cursor := ""
@@ -431,34 +434,9 @@ func hlsWorkerFetchCompressSend(params hlsWorkerFetchCompressSendParams) {
 }
 
 type ScrapeTwitchLiveVodsWithGqlApiParams struct {
-	// Context to cancel the scraping operation.
-	Ctx context.Context
-	// In any interval of this length, the api will be called at most twice and on average once.
-	TwitchGqlFetcherDelay time.Duration
-	// Time limit for .m3u8 and Twitch GQL requests. If this is exceeded in the TwithGQL loop, the for-loop continues. TODO: I should fix this.
-	RequestTimeLimit time.Duration
-	// If a VOD in the queue of live VODs is older than this, it is moved to the old VODs queue.
-	OldVodEvictionThreshold time.Duration
-	// The queue of old VODs for fetching .m3u8 will never exceed this size. The VODs with the lowest view counts are evicted.
-	MaxOldVodsQueueSize int
-	// This is the number of goroutines fetching the .m3u8 files and compressing them.
-	NumHlsFetchers int
-	// In any interval of this length, at most two .m3u8 files will be processed and on average once.
-	HlsFetcherDelay time.Duration
-	// If this amount of time passes since the last time the cursor was reset, the cursor will be reset.
-	CursorResetThreshold time.Duration
-	// This is the libdeflate compression level. The highest is 1 and the lowest is 12.
-	// It seems best when it's 1. The level of compression is good enough and it is fastest.
-	LibdeflateCompressionLevel int
-	// The queue of live VODs includes a VOD iff a VOD has at least this number of viewers.
-	MinViewerCountToObserve int
-	// The queue of old VODs includes a VOD iff a VOD has at least this number of viewers.
-	// If a stream is observed to hvae stopped and then restarted, the stream is still recorded.
-	MinViewerCountToRecord int
-	// Num streams per request (must be between 1 and 30 inclusive)
-	NumStreamsPerRequest int
-	// Cursor at index CursorFactor * len(edges) is used. So it must satisfy 0 <= CursorFactor < 1 to not panic.
-	CursorFactor float64
+	RunScraperParams
+	// initial live vod queue fetched from database
+	InitialLiveVodQueue *liveVodsPriorityQueue
 	// sqlc queries instance
 	Queries *sqlvods.Queries
 }
@@ -469,9 +447,9 @@ type ScrapeTwitchLiveVodsWithGqlApiParams struct {
 // Instead, it resets the cursor and starts over.
 // It stores the results in a database with concurrent updates, so you should use a queries struct that is safe for that.
 // If any database query or modification returns an error, the function finishes and cleans up all resources.
-func ScrapeTwitchLiveVodsWithGqlApi(params ScrapeTwitchLiveVodsWithGqlApiParams) error {
+func ScrapeTwitchLiveVodsWithGqlApi(ctx context.Context, params ScrapeTwitchLiveVodsWithGqlApiParams) error {
 	log.Println("Starting scraping...")
-	ctx, cancel := context.WithCancel(params.Ctx)
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	client := twitchgql.NewTwitchGqlClient()
 	oldVodsCh := make(chan []*LiveVod)
@@ -483,6 +461,7 @@ func ScrapeTwitchLiveVodsWithGqlApi(params ScrapeTwitchLiveVodsWithGqlApiParams)
 		fetchTwitchGqlForeverParams{
 			ctx:                       ctx,
 			client:                    client,
+			initialLiveVodQueue:       params.InitialLiveVodQueue,
 			twitchGqlRequestTimeLimit: params.RequestTimeLimit,
 			twitchGqlFetcherDelay:     params.TwitchGqlFetcherDelay,
 			cursorResetThreshold:      params.CursorResetThreshold,
@@ -533,7 +512,7 @@ func ScrapeTwitchLiveVodsWithGqlApi(params ScrapeTwitchLiveVodsWithGqlApiParams)
 				Public:             result.Public,
 				SubOnly:            result.SubOnly,
 			}
-			err := params.Queries.UpdateRecording(params.Ctx, upsertRecordingParams)
+			err := params.Queries.UpdateRecording(ctx, upsertRecordingParams)
 			if err != nil {
 				log.Println(fmt.Sprint("upserting recording failed: ", err))
 				break
@@ -549,4 +528,99 @@ func ScrapeTwitchLiveVodsWithGqlApi(params ScrapeTwitchLiveVodsWithGqlApiParams)
 	case <-ctx.Done():
 	}
 	return nil
+}
+
+type RunScraperParams struct {
+	// In any interval of this length, the api will be called at most twice and on average once.
+	TwitchGqlFetcherDelay time.Duration
+	// Time limit for .m3u8 and Twitch GQL requests. If this is exceeded in the TwithGQL loop, the for-loop continues. TODO: I should fix this.
+	RequestTimeLimit time.Duration
+	// If a VOD in the queue of live VODs is older than this, it is moved to the old VODs queue.
+	OldVodEvictionThreshold time.Duration
+	// The queue of old VODs for fetching .m3u8 will never exceed this size. The VODs with the lowest view counts are evicted.
+	MaxOldVodsQueueSize int
+	// This is the number of goroutines fetching the .m3u8 files and compressing them.
+	NumHlsFetchers int
+	// In any interval of this length, at most two .m3u8 files will be processed and on average once.
+	HlsFetcherDelay time.Duration
+	// If this amount of time passes since the last time the cursor was reset, the cursor will be reset.
+	CursorResetThreshold time.Duration
+	// This is the libdeflate compression level. The highest is 1 and the lowest is 12.
+	// It seems best when it's 1. The level of compression is good enough and it is fastest.
+	LibdeflateCompressionLevel int
+	// The queue of live VODs includes a VOD iff a VOD has at least this number of viewers.
+	MinViewerCountToObserve int
+	// The queue of old VODs includes a VOD iff a VOD has at least this number of viewers.
+	// If a stream is observed to hvae stopped and then restarted, the stream is still recorded.
+	MinViewerCountToRecord int
+	// Num streams per request (must be between 1 and 30 inclusive)
+	NumStreamsPerRequest int
+	// Cursor at index CursorFactor * len(edges) is used. So it must satisfy 0 <= CursorFactor < 1 to not panic.
+	CursorFactor float64
+}
+
+// databaseUrl is the postgres database to connect to.
+// evictionRatio should be at least 1. We select live vods that were updated at most evictionRatio * oldVodEvictionThreshold ago before the newest live vod.
+// params are the parameters twitch graphql scraper.
+func RunScraper(ctx context.Context, databaseUrl string, evictionRatio float64, params RunScraperParams) error {
+	type tInitialState struct {
+		conn         *pgxpool.Pool
+		queries      *sqlvods.Queries
+		liveVodQueue *liveVodsPriorityQueue
+	}
+	getInitialState := func(ctx context.Context) (*tInitialState, error) {
+		conn, err := pgxpool.Connect(ctx, databaseUrl)
+		if err != nil {
+			log.Println(fmt.Sprint("failed to connect to ", databaseUrl, ": ", err))
+			return nil, err
+		}
+		err = conn.Ping(ctx)
+		if err != nil {
+			log.Println(fmt.Sprint("failed to ping ", databaseUrl, ": ", err))
+			return nil, err
+		}
+		queries := sqlvods.New(conn)
+		latestStreams, err := queries.GetLatestStreams(ctx, 1)
+		if err != nil {
+			log.Println(fmt.Sprint("failed to get latest streams from ", databaseUrl, ": ", err))
+			return nil, err
+		}
+		liveVodQueue := CreateNewLiveVodsPriorityQueue()
+		if len(latestStreams) == 0 {
+			log.Println("there are 0 live vods")
+			return &tInitialState{conn: conn, queries: queries, liveVodQueue: liveVodQueue}, nil
+		}
+		latestStream := latestStreams[0]
+		lastTimeAllowed := latestStream.LastUpdatedAt.Add(-time.Duration(float64(params.OldVodEvictionThreshold) * evictionRatio))
+		latestLiveStreams, err := queries.GetLatestLiveStreams(ctx, lastTimeAllowed)
+		if err != nil {
+			return nil, err
+		}
+		for _, liveStream := range latestLiveStreams {
+			liveVodQueue.UpsertLiveVod(&LiveVod{
+				StreamerId:           liveStream.StreamerID,
+				StreamId:             liveStream.StreamID,
+				StartTime:            liveStream.StartTime,
+				StreamerLoginAtStart: liveStream.StreamerLoginAtStart,
+				MaxViews:             int(liveStream.MaxViews),
+				LastUpdated:          liveStream.LastUpdatedAt,
+			})
+		}
+		return &tInitialState{conn: conn, queries: queries, liveVodQueue: liveVodQueue}, nil
+	}
+	initialState, err := again.Retry(ctx, getInitialState)
+	if err != nil {
+		log.Println(fmt.Sprint("failed to get initial state: ", err))
+		return err
+	}
+	defer initialState.conn.Close()
+	log.Println(fmt.Sprint("entries in liveVodsQueue: ", initialState.liveVodQueue.Size()))
+	return ScrapeTwitchLiveVodsWithGqlApi(
+		ctx,
+		ScrapeTwitchLiveVodsWithGqlApiParams{
+			RunScraperParams:    params,
+			InitialLiveVodQueue: initialState.liveVodQueue,
+			Queries:             initialState.queries,
+		},
+	)
 }

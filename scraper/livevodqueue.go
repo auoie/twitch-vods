@@ -68,48 +68,43 @@ func (vods *liveVodsPriorityQueue) RemoveVod(vod *LiveVod) {
 // Parameters are the information for the VOD.
 // Returns nil error iff new VOD evicts an older VOD.
 // In the above case, the returned VOD will be the evicted VOD.
-// This code scares me. It's probably buggy.
-func (vods *liveVodsPriorityQueue) UpsertVod(
-	curTime time.Time,
-	data VodDataPoint) (*LiveVod, error) {
+func (vods *liveVodsPriorityQueue) UpsertVod(curTime time.Time, data VodDataPoint) (*LiveVod, error) {
 	node := data.Node
-	streamerId := node.Broadcaster.Id
-	streamerLogin := node.Broadcaster.Login
-	streamId := node.Id
-	startTime := node.CreatedAt
-	viewers := node.ViewersCount
+	liveVod := &LiveVod{
+		StreamerId:           node.Broadcaster.Id,
+		StreamId:             node.Id,
+		StartTime:            node.CreatedAt,
+		StreamerLoginAtStart: node.Broadcaster.Login,
+		MaxViews:             node.ViewersCount,
+		LastUpdated:          curTime,
+	}
+	return vods.UpsertLiveVod(liveVod)
+}
+
+// Parameters are the information for the VOD.
+// Returns nil error iff new VOD evicts an older VOD.
+// In the above case, the returned VOD will be the evicted VOD.
+func (vods *liveVodsPriorityQueue) UpsertLiveVod(liveVod *LiveVod) (*LiveVod, error) {
+	streamerId := liveVod.StreamerId
+	streamId := liveVod.StreamId
+	startTime := liveVod.StartTime
+	viewers := liveVod.MaxViews
 	curVod, ok := vods.streamerIdToVod[streamerId] // check if the streamer has an old stream
 	if !ok {
-		newVod := &LiveVod{
-			StreamerId:           streamerId,
-			StreamId:             streamId,
-			StartTime:            startTime,
-			StreamerLoginAtStart: streamerLogin,
-			MaxViews:             viewers,
-			LastUpdated:          curTime,
-		}
-		vods.lastUpdatedToVod.Put(newVod.getLiveVodsKey(), newVod)
-		vods.streamIdToVod[streamId] = newVod
-		vods.streamerIdToVod[streamerId] = newVod
+		vods.lastUpdatedToVod.Put(liveVod.getLiveVodsKey(), liveVod)
+		vods.streamIdToVod[streamId] = liveVod
+		vods.streamerIdToVod[streamerId] = liveVod
 		return nil, errors.New("VOD is new")
 	} else if curVod.StartTime != startTime {
 		vods.RemoveVod(curVod)
-		newVod := &LiveVod{
-			StreamerId:           streamerId,
-			StreamId:             streamId,
-			StartTime:            startTime,
-			StreamerLoginAtStart: streamerLogin,
-			MaxViews:             viewers,
-			LastUpdated:          curTime,
-		}
-		vods.lastUpdatedToVod.Put(newVod.getLiveVodsKey(), newVod)
-		vods.streamIdToVod[streamId] = newVod
-		vods.streamerIdToVod[streamerId] = newVod
+		vods.lastUpdatedToVod.Put(liveVod.getLiveVodsKey(), liveVod)
+		vods.streamIdToVod[streamId] = liveVod
+		vods.streamerIdToVod[streamerId] = liveVod
 		return curVod, nil
 	} else {
 		vods.RemoveVod(curVod)
 		curVod.MaxViews = getMax(viewers, curVod.MaxViews)
-		curVod.LastUpdated = curTime
+		curVod.LastUpdated = liveVod.LastUpdated
 		vods.lastUpdatedToVod.Put(curVod.getLiveVodsKey(), curVod)
 		vods.streamIdToVod[streamId] = curVod
 		vods.streamerIdToVod[streamerId] = curVod

@@ -43,18 +43,6 @@ LEFT JOIN
 ON
   ids.stream_id = streams.stream_id; 
 
--- name: UpsertStream :exec
-INSERT INTO
-  streams (last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start)
-VALUES
-  ($1, $2, $3, $4, $5, $6)
-ON CONFLICT
-  (stream_id)
-DO
-  UPDATE SET
-    last_updated_at = EXCLUDED.last_updated_at,
-    max_views = GREATEST(streams.max_views, EXCLUDED.max_views);
-
 -- name: UpsertManyStreams :exec
 INSERT INTO
   streams (last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start)
@@ -75,23 +63,6 @@ DO
     last_updated_at = EXCLUDED.last_updated_at,
     max_views = GREATEST(streams.max_views, EXCLUDED.max_views);
 
--- name: AddManyStreams :copyfrom
-INSERT INTO
-  streams (last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start)
-VALUES
-  ($1, $2, $3, $4, $5, $6);
-
--- name: GetLatestStreamFromStreamerId :one
-SELECT
-  id, last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start
-FROM
-  streams
-WHERE
-  streamer_id = $1
-ORDER BY
-  start_time DESC
-LIMIT 1;
-
 -- name: GetLatestStreamsFromStreamerId :many
 SELECT
   id, last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start
@@ -103,16 +74,23 @@ ORDER BY
   start_time DESC
 LIMIT $2;
 
--- name: GetLatestStreamFromStreamerLogin :one
+-- name: GetLatestStreams :many
 SELECT
-  id, last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start
+  id, stream_id, streamer_id, start_time, max_views, last_updated_at
+FROM
+  streams
+ORDER BY
+  last_updated_at DESC
+LIMIT $1;
+
+-- name: GetLatestLiveStreams :many
+SELECT
+  id, stream_id, streamer_id, streamer_login_at_start, start_time, max_views, last_updated_at
 FROM
   streams
 WHERE
-  streamer_login_at_start = $1
-ORDER BY
-  start_time DESC
-LIMIT $1;
+  last_updated_at >= $1 AND
+  bytes_found IS NULL;
 
 -- name: UpdateRecording :exec
 UPDATE

@@ -10,6 +10,7 @@ require (
 	github.com/grafov/m3u8 v0.11.1
 	github.com/jackc/pgconn v1.13.0
 	github.com/jackc/pgx/v4 v4.17.2
+	github.com/jdvr/go-again v1.0.0
 	github.com/monitor1379/yagods v1.13.0
 	github.com/urfave/cli/v2 v2.19.2
 )

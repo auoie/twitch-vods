@@ -228,10 +228,11 @@ I should not trust the graphql API to work all the time.
 
 ## TODO
 
-- Change database to store everything in the main streams table
-- Populate the live VODs queue using the database when the program restarts.
-- Use exponential backoff in the case where a connection cannot be established
 - Make a way to evict the gzipped bytes every 60 days. Decide whether I should keep the recording or not.
+- Return VOD to VODs list if it is still live using the GraphQL client to check.
+  Alternatively, when a live vod is fetched, check if it's in the old vod queue. If it's there, remove it from the old vod queue.
+- About 1 percent of public streams fail to fetch. Add a parameter to control how many fetches to try before quitting.
+
 - When I turn on my VPN and turn if off, the Twitch GQL requests work but the cloudfront requests don't work.
   I should try to understand why and fix it.
 - Print debugging statements and errors separately.
@@ -239,4 +240,3 @@ I should not trust the graphql API to work all the time.
   Maybe put these in a database so that I can retrieve them if the program restarts.
   Maybe have some additional service that monitors for client id and cloudfront domains to periodically update the database.
 - Maybe update the list of domains with the domains retrieved via graphql and persist this to DB
-- Return VOD to VODs list if it is still live using the GraphQL client to check
