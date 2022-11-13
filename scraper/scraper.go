@@ -577,12 +577,14 @@ func RunScraper(ctx context.Context, databaseUrl string, evictionRatio float64, 
 		err = conn.Ping(ctx)
 		if err != nil {
 			log.Println(fmt.Sprint("failed to ping ", databaseUrl, ": ", err))
+			conn.Close()
 			return nil, err
 		}
 		queries := sqlvods.New(conn)
 		latestStreams, err := queries.GetLatestStreams(ctx, 1)
 		if err != nil {
 			log.Println(fmt.Sprint("failed to get latest streams from ", databaseUrl, ": ", err))
+			conn.Close()
 			return nil, err
 		}
 		liveVodQueue := CreateNewLiveVodsPriorityQueue()
@@ -594,6 +596,7 @@ func RunScraper(ctx context.Context, databaseUrl string, evictionRatio float64, 
 		lastTimeAllowed := latestStream.LastUpdatedAt.Add(-time.Duration(float64(params.OldVodEvictionThreshold) * evictionRatio))
 		latestLiveStreams, err := queries.GetLatestLiveStreams(ctx, lastTimeAllowed)
 		if err != nil {
+			conn.Close()
 			return nil, err
 		}
 		for _, liveStream := range latestLiveStreams {
