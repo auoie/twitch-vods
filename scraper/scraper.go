@@ -113,13 +113,13 @@ func fetchTwitchGqlForever(params fetchTwitchGqlForeverParams) {
 	twitchGqlTicker := time.NewTicker(params.twitchGqlFetcherDelay)
 	defer twitchGqlTicker.Stop()
 	cursor := ""
-	resetCursorTimeout := time.Now().Add(params.cursorResetThreshold)
+	resetCursorTimeout := time.Now().UTC().Add(params.cursorResetThreshold)
 	debugIndex := -1
 	resetCursor := func() {
 		log.Println(fmt.Sprint("Resetting cursor on debug index: ", debugIndex))
 		debugIndex = -1
 		cursor = ""
-		resetCursorTimeout = time.Now().Add(params.cursorResetThreshold)
+		resetCursorTimeout = time.Now().UTC().Add(params.cursorResetThreshold)
 	}
 	log.Println("Starting twitchgql infinite for loop.")
 	prevEdges := []twitchgql.GetStreamsStreamsStreamConnectionEdgesStreamEdge{}
@@ -132,13 +132,13 @@ func fetchTwitchGqlForever(params fetchTwitchGqlForeverParams) {
 		}
 		debugIndex++
 		debugQueueSizeStart := liveVodQueue.Size()
-		if time.Now().After(resetCursorTimeout) {
+		if time.Now().UTC().After(resetCursorTimeout) {
 			log.Println(fmt.Sprint("Reset cursor because we've been fetching for: ", params.cursorResetThreshold))
 			resetCursor()
 		}
 		requestCtx, requestCancel := context.WithTimeout(params.ctx, params.twitchGqlRequestTimeLimit)
 		streams, err := twitchgql.GetStreams(requestCtx, params.client, params.numStreamsPerRequest, cursor)
-		responseReturnedTime := time.Now()
+		responseReturnedTime := time.Now().UTC()
 		requestCancel()
 		if err != nil {
 			resetCursor()
@@ -397,7 +397,7 @@ func hlsWorkerFetchCompressSend(params hlsWorkerFetchCompressSendParams) {
 		case oldVod = <-params.oldVodJobsCh:
 		}
 		requestCtx, cancel := context.WithTimeout(params.ctx, params.requestTimeLimit)
-		requestInitiated := time.Now()
+		requestInitiated := time.Now().UTC()
 		bytes, dwp, err := getVodCompressedBytes(requestCtx, oldVod.GetVideoData(), params.compressor)
 		cancel()
 		var result *VodResult

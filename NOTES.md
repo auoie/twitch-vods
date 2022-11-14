@@ -231,8 +231,18 @@ I should not trust the graphql API to work all the time.
 - Make a way to evict the gzipped bytes every 60 days. Decide whether I should keep the recording or not.
 - Return VOD to VODs list if it is still live using the GraphQL client to check.
   Alternatively, when a live vod is fetched, check if it's in the old vod queue. If it's there, remove it from the old vod queue.
-- About 1 percent of public streams fail to fetch.
-  This is because the start time in the hls url is one second before the start time reported by the graphql api.
+- Old vods ordered by views is way too big after I stop and restart the program.
+
+  I'm getting this.
+
+  ```text
+  2022/11/13 20:44:38 oldest time allowed: 2022-11-13 20:29:38.903041739 -0800 PST m=-899.400413453
+  2022/11/13 20:44:38 stalestVod: 2022-11-13 20:29:48.939 +0000 UTC
+  ```
+
+  This is caused by uploading `time.Now()` to the database.
+  It saves only the local timestamp.
+  It needs to be `time.Now().UTC()` for anything uploaded to the database.
 
 - When I turn on my VPN and turn if off, the Twitch GQL requests work but the cloudfront requests don't work.
   I should try to understand why and fix it.
