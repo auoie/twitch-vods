@@ -106,6 +106,11 @@ SET
 WHERE
   stream_id = $1;
 
+-- name: DeleteOldStreams :exec
+DELETE FROM streams
+WHERE 
+  start_time < $1;
+
 -- name: GetEverything :many
 SELECT
   *

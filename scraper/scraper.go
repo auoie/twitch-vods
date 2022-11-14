@@ -83,6 +83,7 @@ type fetchTwitchGqlForeverParams struct {
 	queries                   *sqlvods.Queries
 	numStreamsPerRequest      int
 	cursorFactor              float64
+	oldVodsDelete             time.Duration
 	done                      chan struct{}
 }
 
@@ -136,10 +137,12 @@ func fetchTwitchGqlForever(params fetchTwitchGqlForeverParams) {
 			log.Println(fmt.Sprint("Reset cursor because we've been fetching for: ", params.cursorResetThreshold))
 			resetCursor()
 		}
+
 		requestCtx, requestCancel := context.WithTimeout(params.ctx, params.twitchGqlRequestTimeLimit)
 		streams, err := twitchgql.GetStreams(requestCtx, params.client, params.numStreamsPerRequest, cursor)
 		responseReturnedTime := time.Now().UTC()
 		requestCancel()
+
 		if err != nil {
 			resetCursor()
 			log.Println(fmt.Sprint("Twitch graphql client reported an error: ", err))
@@ -189,6 +192,15 @@ func fetchTwitchGqlForever(params fetchTwitchGqlForeverParams) {
 			log.Println("Streamer restarted stream: ", evictedVod.StreamerLoginAtStart)
 			oldVods = append(oldVods, evictedVod)
 		}
+
+		// The queries to delete the old streams and upsert the new streams should be combined into a single transaction
+		requestCtx, requestCancel = context.WithTimeout(params.ctx, params.twitchGqlRequestTimeLimit)
+		err = params.queries.DeleteOldStreams(requestCtx, time.Now().UTC().Add(-params.oldVodsDelete))
+		requestCancel()
+		if err != nil {
+			log.Println(fmt.Sprint("deleting old streams failed: ", err))
+			break
+		}
 		requestCtx, requestCancel = context.WithTimeout(params.ctx, params.twitchGqlRequestTimeLimit)
 		err = params.queries.UpsertManyStreams(requestCtx, twitchGqlResponseToSqlParams(highViewEdges, responseReturnedTime))
 		requestCancel()
@@ -196,6 +208,7 @@ func fetchTwitchGqlForever(params fetchTwitchGqlForeverParams) {
 			log.Println(fmt.Sprint("Upserting streams to streams table failed: ", err))
 			break
 		}
+
 		if debugIndex%debugMod == 0 {
 			log.Println(fmt.Sprint("Live VOD queue size after upserts: ", liveVodQueue.Size()))
 		}
@@ -479,6 +492,7 @@ func ScrapeTwitchLiveVodsWithGqlApi(ctx context.Context, params ScrapeTwitchLive
 			queries:                   params.Queries,
 			numStreamsPerRequest:      params.NumStreamsPerRequest,
 			cursorFactor:              params.CursorFactor,
+			oldVodsDelete:             params.OldVodsDelete,
 			done:                      done,
 		},
 	)
@@ -564,6 +578,8 @@ type RunScraperParams struct {
 	NumStreamsPerRequest int
 	// Cursor at index CursorFactor * len(edges) is used. So it must satisfy 0 <= CursorFactor < 1 to not panic.
 	CursorFactor float64
+	// Vods older than the current time minus this duration will be deleted
+	OldVodsDelete time.Duration
 }
 
 // databaseUrl is the postgres database to connect to.

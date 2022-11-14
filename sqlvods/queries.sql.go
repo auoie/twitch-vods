@@ -13,6 +13,17 @@ import (
 	"github.com/google/uuid"
 )
 
+const deleteOldStreams = `-- name: DeleteOldStreams :exec
+DELETE FROM streams
+WHERE 
+  start_time < $1
+`
+
+func (q *Queries) DeleteOldStreams(ctx context.Context, startTime time.Time) error {
+	_, err := q.db.Exec(ctx, deleteOldStreams, startTime)
+	return err
+}
+
 const deleteStreams = `-- name: DeleteStreams :exec
 DELETE FROM streams
 `

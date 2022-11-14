@@ -29,6 +29,7 @@ func main() {
 			MinViewerCountToObserve:    5,
 			MinViewerCountToRecord:     10,
 			NumStreamsPerRequest:       30,
+			OldVodsDelete:              time.Hour * 24 * 60,
 			CursorFactor:               0.8,
 		})
 }
