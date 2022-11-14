@@ -231,7 +231,8 @@ I should not trust the graphql API to work all the time.
 - Make a way to evict the gzipped bytes every 60 days. Decide whether I should keep the recording or not.
 - Return VOD to VODs list if it is still live using the GraphQL client to check.
   Alternatively, when a live vod is fetched, check if it's in the old vod queue. If it's there, remove it from the old vod queue.
-- About 1 percent of public streams fail to fetch. Add a parameter to control how many fetches to try before quitting.
+- About 1 percent of public streams fail to fetch.
+  This is because the start time in the hls url is one second before the start time reported by the graphql api.
 
 - When I turn on my VPN and turn if off, the Twitch GQL requests work but the cloudfront requests don't work.
   I should try to understand why and fix it.

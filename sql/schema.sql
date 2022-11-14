@@ -28,6 +28,9 @@ CREATE UNIQUE INDEX "streams_stream_id_key" ON "streams"("stream_id");
 CREATE INDEX "streams_streamer_id_start_time_idx" ON "streams"("streamer_id", "start_time" DESC);
 
 -- CreateIndex
+CREATE INDEX "streams_start_time_idx" ON "streams"("start_time" DESC);
+
+-- CreateIndex
 CREATE INDEX "streams_max_views_idx" ON "streams"("max_views" DESC);
 
 -- CreateIndex

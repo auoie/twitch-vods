@@ -312,6 +312,13 @@ func getCompressedBytes(bytes []byte, compressor *libdeflate.Compressor) ([]byte
 func getVodCompressedBytes(ctx context.Context, videoData *vods.VideoData, compressor *libdeflate.Compressor) ([]byte, *vods.DomainWithPath, error) {
 	dwp, err := getFirstValidDwpResponse(ctx, videoData)
 	if err != nil {
+		dwp, err = getFirstValidDwpResponse(ctx, &vods.VideoData{
+			StreamerName: videoData.StreamerName,
+			VideoId:      videoData.VideoId,
+			Time:         videoData.Time.Add(-time.Second),
+		})
+	}
+	if err != nil {
 		log.Println(fmt.Sprint("Link was not found for ", videoData.StreamerName, " because: ", err))
 		return nil, nil, err
 	}
