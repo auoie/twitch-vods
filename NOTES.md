@@ -228,7 +228,8 @@ I should not trust the graphql API to work all the time.
 
 ## TODO
 
-- If the scraper crashes, keep it going by maintaining an infinite for loop.
+- I'm maintaining an infinite for loop.
+  I should check if all the goroutines are closed using some tool to inspect the program internals.
 - Return VOD to VODs list if it is still live using the GraphQL client to check.
   Alternatively, when a live vod is fetched, check if it's in the old vod queue. If it's there, remove it from the old vod queue.
 

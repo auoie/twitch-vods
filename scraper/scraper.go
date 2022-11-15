@@ -650,3 +650,26 @@ func RunScraper(ctx context.Context, databaseUrl string, evictionRatio float64, 
 		},
 	)
 }
+
+func RunScraperForever(ctx context.Context, scraperDuration time.Duration, databaseUrl string, evictionRatio float64, params RunScraperParams) {
+	signal := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-signal:
+				scraperCtx, cancelScraper := context.WithTimeout(ctx, scraperDuration)
+				RunScraper(scraperCtx, databaseUrl, evictionRatio, params)
+				cancelScraper()
+			}
+		}
+	}()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case signal <- struct{}{}:
+		}
+	}
+}

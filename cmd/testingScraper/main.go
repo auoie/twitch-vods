@@ -13,8 +13,9 @@ func main() {
 	if !ok {
 		databaseUrl = "postgresql://govods:password@localhost:5432/twitch"
 	}
-	scraper.RunScraper(
+	scraper.RunScraperForever(
 		context.Background(),
+		12*time.Hour,
 		databaseUrl,
 		1.1,
 		scraper.RunScraperParams{
@@ -31,5 +32,6 @@ func main() {
 			NumStreamsPerRequest:       30,
 			OldVodsDelete:              time.Hour * 24 * 60,
 			CursorFactor:               0.8,
-		})
+		},
+	)
 }
