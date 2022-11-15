@@ -519,7 +519,15 @@ func ScrapeTwitchLiveVodsWithGqlApi(ctx context.Context, params ScrapeTwitchLive
 	}
 	go func() {
 		for {
-			result := <-resultsCh
+			var result *VodResult
+			select {
+			case result = <-resultsCh:
+			case <-ctx.Done():
+			}
+			if result == nil {
+				log.Println("ctx is done meaning result is nil, so breaking")
+				break
+			}
 			log.Println("Result was logged:")
 			log.Println(*result.Vod)
 			log.Println(fmt.Sprint("Gzipped size: ", len(result.HlsBytes)))
