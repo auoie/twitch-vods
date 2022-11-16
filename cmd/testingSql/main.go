@@ -145,7 +145,7 @@ func main() {
 	log.Print()
 
 	err = queries.UpdateRecording(context.Background(), sqlvods.UpdateRecordingParams{
-		BrotliBytes:        []byte{'a', 'b', 'c'},
+		GzippedBytes:       []byte{'a', 'b', 'c'},
 		StreamID:           "lskdjfslkjf",
 		BytesFound:         sql.NullBool{Bool: true, Valid: true},
 		RecordingFetchedAt: sql.NullTime{Time: time.Now(), Valid: true}})
@@ -156,7 +156,7 @@ func main() {
 	log.Println(streams[0].StreamID)
 	logFatalOnError(queries.UpdateRecording(context.Background(), sqlvods.UpdateRecordingParams{
 		RecordingFetchedAt: sql.NullTime{Time: time.Now(), Valid: true},
-		BrotliBytes:        []byte{'a', 'b', 'c'},
+		GzippedBytes:       []byte{'a', 'b', 'c'},
 		StreamID:           streams[0].StreamID,
 		BytesFound:         sql.NullBool{Bool: true, Valid: true}}))
 	everything, err = queries.GetEverything(context.Background())
@@ -167,7 +167,7 @@ func main() {
 
 	logFatalOnError(queries.UpdateRecording(context.Background(), sqlvods.UpdateRecordingParams{
 		RecordingFetchedAt: sql.NullTime{Time: time.Now(), Valid: true},
-		BrotliBytes:        nil,
+		GzippedBytes:       nil,
 		StreamID:           streams[0].StreamID,
 		BytesFound:         sql.NullBool{Bool: false, Valid: true},
 		Public:             sql.NullBool{Bool: true, Valid: false},

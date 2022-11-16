@@ -117,7 +117,7 @@ UPDATE
 SET
   recording_fetched_at = $2,
   hls_domain = $3,
-  brotli_bytes = $4,
+  gzipped_bytes = $4,
   bytes_found = $5,
   seek_previews_domain = $6,
   public = $7,
@@ -141,13 +141,21 @@ DELETE FROM streams
 WHERE 
   start_time < $1;
 
--- name: GetAllGzippedBytes :many
+-- name: GetAllGzippedBytesNotBrotli :many
 SELECT
   id, gzipped_bytes
 FROM
   streams
 WHERE
-  gzipped_bytes IS NOT NULL;
+  gzipped_bytes IS NOT NULL AND brotli_bytes IS NULL;
+
+-- name: GetAllBrotliBytesNotGzip :many
+SELECT
+  id, brotli_bytes
+FROM
+  streams
+WHERE
+  brotli_bytes IS NOT NULL AND gzipped_bytes IS NULL;
 
 -- name: SetBrotliBytes :exec
 WITH 
@@ -159,6 +167,21 @@ UPDATE
   streams
 SET
   brotli_bytes = input_bytes.brotli_bytes
+FROM
+  input_bytes
+WHERE
+  streams.id = input_bytes.id;
+
+-- name: SetGzipBytes :exec
+WITH 
+  input_bytes AS
+(SELECT
+  unnest(@id_arr::UUID[]) AS id,
+  unnest(@gzip_bytes_arr::BYTEA[]) AS gzip_bytes)
+UPDATE
+  streams
+SET
+  gzipped_bytes = input_bytes.gzip_bytes
 FROM
   input_bytes
 WHERE

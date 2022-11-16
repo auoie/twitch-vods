@@ -3,7 +3,9 @@ package main
 import (
 	"bytes"
 	"flag"
+	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 
@@ -14,7 +16,7 @@ var (
 	levelPointer = flag.Int("LEVEL", 2, "brotli compression level")
 )
 
-func main() {
+func testWriting() {
 	flag.Parse()
 	compressionLevel := *levelPointer
 	buffer := &bytes.Buffer{}
@@ -32,4 +34,23 @@ func main() {
 		log.Fatal(err)
 	}
 	os.Stdout.Write(buffer.Bytes())
+}
+
+func testReading() {
+	inputBytes, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		log.Fatal(err)
+	}
+	br := bytes.NewReader(inputBytes)
+	decompressor := brotli.NewReader(br)
+	decompressed, err := ioutil.ReadAll(decompressor)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(string(decompressed))
+	fmt.Println("done writing")
+}
+
+func main() {
+	testReading()
 }

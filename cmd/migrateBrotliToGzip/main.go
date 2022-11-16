@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"os"
 
@@ -17,8 +18,18 @@ import (
 const N = 12
 
 type TResponse struct {
-	id          uuid.UUID
-	brotliBytes []byte
+	id        uuid.UUID
+	gzipBytes []byte
+}
+
+func getCompressedBytes(bytes []byte, compressor *libdeflate.Compressor) ([]byte, error) {
+	compressedBytes := make([]byte, len(bytes))
+	n, _, err := compressor.Compress(bytes, compressedBytes, libdeflate.ModeGzip)
+	if err != nil {
+		return nil, err
+	}
+	compressedBytes = compressedBytes[:n]
+	return compressedBytes, nil
 }
 
 func main() {
@@ -39,15 +50,14 @@ func main() {
 		log.Fatal(err)
 	}
 	queries := sqlvods.New(conn)
-	log.Println(fmt.Sprint("Retrieving bytes from ", databaseUrl))
-	rows, err := queries.GetAllGzippedBytesNotBrotli(context.Background())
-	log.Println(fmt.Sprint("Got ", len(rows), " rows."))
+	log.Println(fmt.Sprint("Retrieving brotli bytes from ", databaseUrl))
+	rows, err := queries.GetAllBrotliBytesNotGzip(context.Background())
+	log.Println(fmt.Sprint("Got ", len(rows), " brotli rows."))
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	log.Println("Decompress and write bytes")
-	requestChan := make(chan sqlvods.GetAllGzippedBytesNotBrotliRow)
+	requestChan := make(chan sqlvods.GetAllBrotliBytesNotGzipRow)
 	responseChan := make(chan TResponse)
 	numRows := len(rows)
 	// numRows := 50000
@@ -59,45 +69,43 @@ func main() {
 	}()
 	for i := 0; i < N; i++ {
 		go func() {
-			dc, err := libdeflate.NewDecompressor()
+			compressor, err := libdeflate.NewCompressorLevel(1)
 			if err != nil {
 				log.Fatal(err)
 			}
 			for {
 				request := <-requestChan
-				gzipBytes := request.GzippedBytes
-				if gzipBytes == nil {
-					responseChan <- TResponse{id: request.ID, brotliBytes: nil}
+				brotliBytes := request.BrotliBytes
+				if brotliBytes == nil {
+					responseChan <- TResponse{id: request.ID, gzipBytes: nil}
 					continue
 				}
-				_, fullBytes, err := dc.Decompress(gzipBytes, nil, libdeflate.ModeGzip)
+				br := bytes.NewReader(brotliBytes)
+				decompressor := brotli.NewReader(br)
+				decompressed, err := io.ReadAll(decompressor)
 				if err != nil {
 					log.Fatal(err)
 				}
-				buffer := &bytes.Buffer{}
-				writer := brotli.NewWriterLevel(buffer, 2)
-				_, err = writer.Write(fullBytes)
+				gzipBytes, err := getCompressedBytes(decompressed, &compressor)
 				if err != nil {
 					log.Fatal(err)
 				}
-				writer.Close()
-				brotliBytes := buffer.Bytes()
-				responseChan <- TResponse{id: request.ID, brotliBytes: brotliBytes}
+				responseChan <- TResponse{id: request.ID, gzipBytes: gzipBytes}
 			}
 		}()
 	}
 	idArr := []uuid.UUID{}
-	brotliBytesArr := [][]byte{}
+	gzipBytesArr := [][]byte{}
 	for i := 0; i < numRows; i++ {
 		if i%10000 == 0 {
 			log.Println(fmt.Sprint("On row ", i))
 		}
 		response := <-responseChan
 		idArr = append(idArr, response.id)
-		brotliBytesArr = append(brotliBytesArr, response.brotliBytes)
+		gzipBytesArr = append(gzipBytesArr, response.gzipBytes)
 	}
-	log.Println("Got all brotli bytes")
-	err = queries.SetBrotliBytes(context.Background(), sqlvods.SetBrotliBytesParams{IDArr: idArr, BrotliBytesArr: brotliBytesArr})
+	log.Println("Got all gzip bytes")
+	err = queries.SetGzipBytes(context.Background(), sqlvods.SetGzipBytesParams{IDArr: idArr, GzipBytesArr: gzipBytesArr})
 	if err != nil {
 		log.Fatal(err)
 	}
