@@ -1,14 +1,15 @@
 package scraper
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"fmt"
 	"log"
 	"time"
 
-	"github.com/4kills/go-libdeflate/v2"
 	"github.com/Khan/genqlient/graphql"
+	"github.com/andybalholm/brotli"
 	"github.com/auoie/goVods/sqlvods"
 	"github.com/auoie/goVods/twitchgql"
 	"github.com/auoie/goVods/vods"
@@ -31,7 +32,7 @@ type LiveVod struct {
 	LastUpdated          time.Time
 
 	// At the moment, I don't do anything with this. Storing it would use up a lot of space.
-	// Should I serialize it with something like Protobuf and then GZIP it?
+	// Should I serialize it with something like Protobuf and then compress (gzip, brotli, zstd) it?
 	// Should I use an OLAP database (Clickhouse or TimeScale)?
 	// TimeSeries []VodDataPoint
 }
@@ -311,18 +312,22 @@ func getCleanedMediaPlaylistBytes(dwp *vods.ValidDwpResponse) (*m3u8.MediaPlayli
 	return mediapl, nil
 }
 
-func getCompressedBytes(bytes []byte, compressor *libdeflate.Compressor) ([]byte, error) {
-	compressedBytes := make([]byte, len(bytes))
-	n, _, err := compressor.Compress(bytes, compressedBytes, libdeflate.ModeGzip)
+func getCompressedBytes(inputBytes []byte, brotliLevel int) ([]byte, error) {
+	buffer := &bytes.Buffer{}
+	brotliWriter := brotli.NewWriterLevel(buffer, brotliLevel)
+	_, err := brotliWriter.Write(inputBytes)
 	if err != nil {
 		return nil, err
 	}
-	compressedBytes = compressedBytes[:n]
-	return compressedBytes, nil
+	err = brotliWriter.Close()
+	if err != nil {
+		return nil, err
+	}
+	return buffer.Bytes(), nil
 }
 
 // Find the .m3u8 for a video and return the compressed bytes.
-func getVodCompressedBytes(ctx context.Context, videoData *vods.VideoData, compressor *libdeflate.Compressor) ([]byte, *vods.DomainWithPath, error) {
+func getVodCompressedBytes(ctx context.Context, videoData *vods.VideoData, brotliLevel int) ([]byte, *vods.DomainWithPath, error) {
 	dwp, err := getFirstValidDwpResponse(ctx, videoData)
 	if err != nil {
 		dwp, err = getFirstValidDwpResponse(ctx, &vods.VideoData{
@@ -341,7 +346,7 @@ func getVodCompressedBytes(ctx context.Context, videoData *vods.VideoData, compr
 		log.Println(mediapl.String())
 		return nil, nil, err
 	}
-	compressedBytes, err := getCompressedBytes(mediapl.Encode().Bytes(), compressor)
+	compressedBytes, err := getCompressedBytes(mediapl.Encode().Bytes(), brotliLevel)
 	if err != nil {
 		log.Println(fmt.Sprint("Compressing failed for ", videoData.StreamerName, " because: ", err))
 		return nil, nil, err
@@ -389,14 +394,13 @@ type hlsWorkerFetchCompressSendParams struct {
 	client           graphql.Client
 	oldVodJobsCh     chan *LiveVod
 	hlsFetcherDelay  time.Duration
-	compressor       *libdeflate.Compressor
+	brotliLevel      int
 	resultsCh        chan *VodResult
 	requestTimeLimit time.Duration
 }
 
 func hlsWorkerFetchCompressSend(params hlsWorkerFetchCompressSendParams) {
 	hlsFetcherTicker := time.NewTicker(params.hlsFetcherDelay)
-	defer params.compressor.Close()
 	for {
 		select {
 		case <-params.ctx.Done():
@@ -411,7 +415,7 @@ func hlsWorkerFetchCompressSend(params hlsWorkerFetchCompressSendParams) {
 		}
 		requestCtx, cancel := context.WithTimeout(params.ctx, params.requestTimeLimit)
 		requestInitiated := time.Now().UTC()
-		bytes, dwp, err := getVodCompressedBytes(requestCtx, oldVod.GetVideoData(), params.compressor)
+		bytes, dwp, err := getVodCompressedBytes(requestCtx, oldVod.GetVideoData(), params.brotliLevel)
 		cancel()
 		var result *VodResult
 		if err != nil {
@@ -503,16 +507,12 @@ func ScrapeTwitchLiveVodsWithGqlApi(ctx context.Context, params ScrapeTwitchLive
 		maxOldVodsQueueSize: params.MaxOldVodsQueueSize,
 	})
 	for i := 0; i < params.NumHlsFetchers; i++ {
-		compressor, err := libdeflate.NewCompressorLevel(params.LibdeflateCompressionLevel)
-		if err != nil {
-			return err
-		}
 		go hlsWorkerFetchCompressSend(hlsWorkerFetchCompressSendParams{
 			ctx:              ctx,
 			client:           client,
 			oldVodJobsCh:     oldVodJobsCh,
 			hlsFetcherDelay:  params.HlsFetcherDelay,
-			compressor:       &compressor,
+			brotliLevel:      params.BrotliLevel,
 			resultsCh:        resultsCh,
 			requestTimeLimit: params.RequestTimeLimit,
 		})
@@ -530,10 +530,10 @@ func ScrapeTwitchLiveVodsWithGqlApi(ctx context.Context, params ScrapeTwitchLive
 			}
 			log.Println("Result was logged:")
 			log.Println(*result.Vod)
-			log.Println(fmt.Sprint("Gzipped size: ", len(result.HlsBytes)))
+			log.Println(fmt.Sprint("Brotli bytes size: ", len(result.HlsBytes)))
 			upsertRecordingParams := sqlvods.UpdateRecordingParams{
 				RecordingFetchedAt: sql.NullTime{Time: result.RequestInitiated, Valid: true},
-				GzippedBytes:       result.HlsBytes,
+				BrotliBytes:        result.HlsBytes,
 				StreamID:           result.Vod.StreamId,
 				BytesFound:         sql.NullBool{Bool: result.HlsBytesFound, Valid: true},
 				HlsDomain:          result.HlsDomain,
@@ -574,9 +574,9 @@ type RunScraperParams struct {
 	HlsFetcherDelay time.Duration
 	// If this amount of time passes since the last time the cursor was reset, the cursor will be reset.
 	CursorResetThreshold time.Duration
-	// This is the libdeflate compression level. The highest is 1 and the lowest is 12.
-	// It seems best when it's 1. The level of compression is good enough and it is fastest.
-	LibdeflateCompressionLevel int
+	// This is the brotli compression level. The highest is 1 and the lowest is 9.
+	// The compression seems good enough at 2. The level of compression is good enough and it is still fast.
+	BrotliLevel int
 	// The queue of live VODs includes a VOD iff a VOD has at least this number of viewers.
 	MinViewerCountToObserve int
 	// The queue of old VODs includes a VOD iff a VOD has at least this number of viewers.

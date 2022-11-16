@@ -221,6 +221,9 @@ SELECT s.*, r.bytes_found, r.fetched_at, r.bytes_found FROM streams s JOIN recor
 gives results.
 I'm guessing it failed because it might keep all of the gzipped bytes in memory.
 
+In order to update a bunch of rows using a subquery, see [here](https://stackoverflow.com/a/45465626).
+This seems like the most modern approach.
+
 ## Twitch
 
 The Twitch GraphQL resolver for videos (in particular, past broadcasts) went down for a short period.

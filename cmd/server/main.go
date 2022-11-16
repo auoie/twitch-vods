@@ -81,7 +81,7 @@ func main() {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		streams, err := queries.GetStreamBytes(ctx, streamid)
+		streams, err := queries.GetStreamBrotliBytes(ctx, streamid)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
@@ -95,7 +95,7 @@ func main() {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		w.Header().Set("Content-Encoding", "gzip")
+		w.Header().Set("Content-Encoding", "br")
 		w.Write(streamBytes)
 	})
 	http.ListenAndServe(":3000", router)

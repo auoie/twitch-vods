@@ -1,6 +1,15 @@
--- name: GetStreamBytes :many
+-- name: GetStreamGzippedBytes :many
 SELECT
   gzipped_bytes
+FROM
+  streams
+WHERE
+  stream_id = $1
+LIMIT 1;
+
+-- name: GetStreamBrotliBytes :many
+SELECT
+  brotli_bytes
 FROM
   streams
 WHERE
@@ -108,7 +117,7 @@ UPDATE
 SET
   recording_fetched_at = $2,
   hls_domain = $3,
-  gzipped_bytes = $4,
+  brotli_bytes = $4,
   bytes_found = $5,
   seek_previews_domain = $6,
   public = $7,
@@ -131,6 +140,29 @@ LIMIT $4;
 DELETE FROM streams
 WHERE 
   start_time < $1;
+
+-- name: GetAllGzippedBytes :many
+SELECT
+  id, gzipped_bytes
+FROM
+  streams
+WHERE
+  gzipped_bytes IS NOT NULL;
+
+-- name: SetBrotliBytes :exec
+WITH 
+  input_bytes AS
+(SELECT
+  unnest(@id_arr::UUID[]) AS id,
+  unnest(@brotli_bytes_arr::BYTEA[]) AS brotli_bytes)
+UPDATE
+  streams
+SET
+  brotli_bytes = input_bytes.brotli_bytes
+FROM
+  input_bytes
+WHERE
+  streams.id = input_bytes.id;
 
 -- name: GetEverything :many
 SELECT
