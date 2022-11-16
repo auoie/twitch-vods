@@ -78,6 +78,64 @@ func (q *Queries) GetEverything(ctx context.Context) ([]Stream, error) {
 	return items, nil
 }
 
+const getHighestViewedLiveStreams = `-- name: GetHighestViewedLiveStreams :many
+SELECT
+  streamer_login_at_start, title_at_start, max_views, start_time, stream_id
+FROM
+  streams
+WHERE
+  bytes_found = $1 AND public = $2 AND language_at_start = $3
+ORDER BY
+  max_views DESC
+LIMIT $4
+`
+
+type GetHighestViewedLiveStreamsParams struct {
+	BytesFound      sql.NullBool
+	Public          sql.NullBool
+	LanguageAtStart string
+	Limit           int32
+}
+
+type GetHighestViewedLiveStreamsRow struct {
+	StreamerLoginAtStart string
+	TitleAtStart         string
+	MaxViews             int64
+	StartTime            time.Time
+	StreamID             string
+}
+
+func (q *Queries) GetHighestViewedLiveStreams(ctx context.Context, arg GetHighestViewedLiveStreamsParams) ([]GetHighestViewedLiveStreamsRow, error) {
+	rows, err := q.db.Query(ctx, getHighestViewedLiveStreams,
+		arg.BytesFound,
+		arg.Public,
+		arg.LanguageAtStart,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetHighestViewedLiveStreamsRow
+	for rows.Next() {
+		var i GetHighestViewedLiveStreamsRow
+		if err := rows.Scan(
+			&i.StreamerLoginAtStart,
+			&i.TitleAtStart,
+			&i.MaxViews,
+			&i.StartTime,
+			&i.StreamID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getLatestLiveStreams = `-- name: GetLatestLiveStreams :many
 SELECT
   id, stream_id, streamer_id, streamer_login_at_start, start_time, max_views, last_updated_at
@@ -178,15 +236,15 @@ SELECT
 FROM
   streams
 WHERE
-  stream_id = $1
+  streamer_id = $1
 ORDER BY
   start_time DESC
 LIMIT $2
 `
 
 type GetLatestStreamsFromStreamerIdParams struct {
-	StreamID string
-	Limit    int32
+	StreamerID string
+	Limit      int32
 }
 
 type GetLatestStreamsFromStreamerIdRow struct {
@@ -200,7 +258,7 @@ type GetLatestStreamsFromStreamerIdRow struct {
 }
 
 func (q *Queries) GetLatestStreamsFromStreamerId(ctx context.Context, arg GetLatestStreamsFromStreamerIdParams) ([]GetLatestStreamsFromStreamerIdRow, error) {
-	rows, err := q.db.Query(ctx, getLatestStreamsFromStreamerId, arg.StreamID, arg.Limit)
+	rows, err := q.db.Query(ctx, getLatestStreamsFromStreamerId, arg.StreamerID, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -227,50 +285,37 @@ func (q *Queries) GetLatestStreamsFromStreamerId(ctx context.Context, arg GetLat
 	return items, nil
 }
 
-const getStreamByStreamId = `-- name: GetStreamByStreamId :one
-SELECT 
-  id, last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start
+const getLatestStreamsFromStreamerLogin = `-- name: GetLatestStreamsFromStreamerLogin :many
+WITH
+  goal_id AS
+(SELECT
+  streamer_id
 FROM
   streams
 WHERE
-  stream_id = $1
-`
-
-type GetStreamByStreamIdRow struct {
-	ID                   uuid.UUID
-	LastUpdatedAt        time.Time
-	MaxViews             int64
-	StartTime            time.Time
-	StreamerID           string
-	StreamID             string
-	StreamerLoginAtStart string
-}
-
-func (q *Queries) GetStreamByStreamId(ctx context.Context, streamID string) (GetStreamByStreamIdRow, error) {
-	row := q.db.QueryRow(ctx, getStreamByStreamId, streamID)
-	var i GetStreamByStreamIdRow
-	err := row.Scan(
-		&i.ID,
-		&i.LastUpdatedAt,
-		&i.MaxViews,
-		&i.StartTime,
-		&i.StreamerID,
-		&i.StreamID,
-		&i.StreamerLoginAtStart,
-	)
-	return i, err
-}
-
-const getStreamForEachStreamId = `-- name: GetStreamForEachStreamId :many
+  streams.streamer_login_at_start = $1
+ORDER BY
+  start_time DESC
+LIMIT 1)
 SELECT
-  id, last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start
-FROM 
-  streams
-WHERE
-  stream_id = ANY($1::TEXT[])
+  id, last_updated_at, max_views, start_time, s.streamer_id, stream_id, streamer_login_at_start
+FROM
+  streams s
+INNER JOIN
+  goal_id
+ON
+  s.streamer_id = goal_id.streamer_id
+ORDER BY
+  start_time DESC
+LIMIT $2
 `
 
-type GetStreamForEachStreamIdRow struct {
+type GetLatestStreamsFromStreamerLoginParams struct {
+	StreamerLoginAtStart string
+	Limit                int32
+}
+
+type GetLatestStreamsFromStreamerLoginRow struct {
 	ID                   uuid.UUID
 	LastUpdatedAt        time.Time
 	MaxViews             int64
@@ -280,15 +325,15 @@ type GetStreamForEachStreamIdRow struct {
 	StreamerLoginAtStart string
 }
 
-func (q *Queries) GetStreamForEachStreamId(ctx context.Context, dollar_1 []string) ([]GetStreamForEachStreamIdRow, error) {
-	rows, err := q.db.Query(ctx, getStreamForEachStreamId, dollar_1)
+func (q *Queries) GetLatestStreamsFromStreamerLogin(ctx context.Context, arg GetLatestStreamsFromStreamerLoginParams) ([]GetLatestStreamsFromStreamerLoginRow, error) {
+	rows, err := q.db.Query(ctx, getLatestStreamsFromStreamerLogin, arg.StreamerLoginAtStart, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []GetStreamForEachStreamIdRow
+	var items []GetLatestStreamsFromStreamerLoginRow
 	for rows.Next() {
-		var i GetStreamForEachStreamIdRow
+		var i GetLatestStreamsFromStreamerLoginRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.LastUpdatedAt,
@@ -301,6 +346,36 @@ func (q *Queries) GetStreamForEachStreamId(ctx context.Context, dollar_1 []strin
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getStreamBytes = `-- name: GetStreamBytes :many
+SELECT
+  gzipped_bytes
+FROM
+  streams
+WHERE
+  stream_id = $1
+LIMIT 1
+`
+
+func (q *Queries) GetStreamBytes(ctx context.Context, streamID string) ([][]byte, error) {
+	rows, err := q.db.Query(ctx, getStreamBytes, streamID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items [][]byte
+	for rows.Next() {
+		var gzipped_bytes []byte
+		if err := rows.Scan(&gzipped_bytes); err != nil {
+			return nil, err
+		}
+		items = append(items, gzipped_bytes)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -340,53 +415,6 @@ func (q *Queries) GetStreamForEachStreamIdUnnest(ctx context.Context, streamIDAr
 	var items []GetStreamForEachStreamIdUnnestRow
 	for rows.Next() {
 		var i GetStreamForEachStreamIdUnnestRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.LastUpdatedAt,
-			&i.MaxViews,
-			&i.StartTime,
-			&i.StreamerID,
-			&i.StreamID,
-			&i.StreamerLoginAtStart,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getStreamsByStreamId = `-- name: GetStreamsByStreamId :many
-SELECT 
-  id, last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start
-FROM
-  streams
-WHERE
-  stream_id = $1
-`
-
-type GetStreamsByStreamIdRow struct {
-	ID                   uuid.UUID
-	LastUpdatedAt        time.Time
-	MaxViews             int64
-	StartTime            time.Time
-	StreamerID           string
-	StreamID             string
-	StreamerLoginAtStart string
-}
-
-func (q *Queries) GetStreamsByStreamId(ctx context.Context, streamID string) ([]GetStreamsByStreamIdRow, error) {
-	rows, err := q.db.Query(ctx, getStreamsByStreamId, streamID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []GetStreamsByStreamIdRow
-	for rows.Next() {
-		var i GetStreamsByStreamIdRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.LastUpdatedAt,

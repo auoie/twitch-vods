@@ -24,8 +24,9 @@ model streams {
   seek_previews_domain String?
 
   @@index([streamer_id, start_time(sort: Desc)])
+  @@index([streamer_login_at_start, start_time(sort: Desc)])
   @@index([start_time(sort: Desc)])
-  
+
   @@index([max_views(sort: Desc)])
   @@index([bytes_found, max_views(sort: Desc)])
   @@index([sub_only, max_views(sort: Desc)])

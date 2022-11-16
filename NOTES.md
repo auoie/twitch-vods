@@ -228,11 +228,14 @@ I should not trust the graphql API to work all the time.
 
 ## TODO
 
+- Migrate to brotli compression instead
 - I'm maintaining an infinite for loop.
   I should check if all the goroutines are closed using some tool to inspect the program internals.
 - Return VOD to VODs list if it is still live using the GraphQL client to check.
   Alternatively, when a live vod is fetched, check if it's in the old vod queue. If it's there, remove it from the old vod queue.
-
+- The m3u8 cloudfront links stopped working for about 5 minutes.
+  As a result, like 60 public videos didn't have their m3u8 contents fetched.
+  I'm not sure how to handle this.
 - When I turn on my VPN and turn if off, the Twitch GQL requests work but the cloudfront requests don't work.
   I should try to understand why and fix it.
 - Print debugging statements and errors separately.

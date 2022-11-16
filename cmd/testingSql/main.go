@@ -128,15 +128,17 @@ func main() {
 	log.Println(len(everything))
 	log.Print()
 
-	helloStream, err := queries.GetStreamByStreamId(context.Background(), "hello")
-	log.Println(err)
-	log.Println(helloStream)
-
-	helloStreams, err := queries.GetStreamsByStreamId(context.Background(), "hello")
-	logFatalOnError(err)
-	log.Println(len(helloStreams))
-
-	streams, err := queries.GetStreamForEachStreamId(context.Background(), []string{"hmm", "streamid0", "doesn't exist"})
+	batchedStreams := queries.GetStreamForEachStreamIdBatched(context.Background(), []string{"hmm", "streamid0", "doesn't exist"})
+	streams := []sqlvods.GetStreamForEachStreamIdBatchedRow{}
+	batchedStreams.Query(func(i int, gsfesibr []sqlvods.GetStreamForEachStreamIdBatchedRow, err error) {
+		if err != nil {
+			return
+		}
+		if len(gsfesibr) != 1 {
+			return
+		}
+		streams = append(streams, gsfesibr[0])
+	})
 	logFatalOnError(err)
 	log.Println(streams)
 	log.Println(len(streams))

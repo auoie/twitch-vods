@@ -1,26 +1,11 @@
--- name: GetStreamByStreamId :one
-SELECT 
-  id, last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start
-FROM
-  streams
-WHERE
-  stream_id = $1;
-
--- name: GetStreamsByStreamId :many
-SELECT 
-  id, last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start
-FROM
-  streams
-WHERE
-  stream_id = $1;
-
--- name: GetStreamForEachStreamId :many
+-- name: GetStreamBytes :many
 SELECT
-  id, last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start
-FROM 
+  gzipped_bytes
+FROM
   streams
 WHERE
-  stream_id = ANY($1::TEXT[]);
+  stream_id = $1
+LIMIT 1;
 
 -- name: GetStreamForEachStreamIdBatched :batchmany
 SELECT
@@ -30,6 +15,31 @@ FROM
 WHERE
   stream_id = $1
 LIMIT 1;
+
+-- name: GetLatestStreamsFromStreamerLogin :many
+WITH
+  goal_id AS
+(SELECT
+  streamer_id
+FROM
+  streams
+WHERE
+  streams.streamer_login_at_start = $1
+ORDER BY
+  start_time DESC
+LIMIT 1)
+SELECT
+  id, last_updated_at, max_views, start_time, s.streamer_id, stream_id, streamer_login_at_start
+FROM
+  streams s
+INNER JOIN
+  goal_id
+ON
+  s.streamer_id = goal_id.streamer_id
+ORDER BY
+  start_time DESC
+LIMIT $2;
+
 
 -- name: GetStreamForEachStreamIdUnnest :many
 WITH
@@ -69,7 +79,7 @@ SELECT
 FROM
   streams
 WHERE
-  stream_id = $1
+  streamer_id = $1
 ORDER BY
   start_time DESC
 LIMIT $2;
@@ -105,6 +115,17 @@ SET
   sub_only = $8
 WHERE
   stream_id = $1;
+
+-- name: GetHighestViewedLiveStreams :many
+SELECT
+  streamer_login_at_start, title_at_start, max_views, start_time, stream_id
+FROM
+  streams
+WHERE
+  bytes_found = $1 AND public = $2 AND language_at_start = $3
+ORDER BY
+  max_views DESC
+LIMIT $4;
 
 -- name: DeleteOldStreams :exec
 DELETE FROM streams
