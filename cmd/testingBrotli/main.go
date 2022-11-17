@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 
@@ -43,7 +42,7 @@ func testReading() {
 	}
 	br := bytes.NewReader(inputBytes)
 	decompressor := brotli.NewReader(br)
-	decompressed, err := ioutil.ReadAll(decompressor)
+	decompressed, err := io.ReadAll(decompressor)
 	if err != nil {
 		log.Fatal(err)
 	}
