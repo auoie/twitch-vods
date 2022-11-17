@@ -17,7 +17,6 @@ model streams {
 
   recording_fetched_at DateTime?
   gzipped_bytes        Bytes?
-  brotli_bytes         Bytes?
   hls_domain           String?
   bytes_found          Boolean?
   public               Boolean?

@@ -24,7 +24,6 @@ type Stream struct {
 	GameNameAtStart      string
 	RecordingFetchedAt   sql.NullTime
 	GzippedBytes         []byte
-	BrotliBytes          []byte
 	HlsDomain            sql.NullString
 	BytesFound           sql.NullBool
 	Public               sql.NullBool

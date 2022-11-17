@@ -33,77 +33,9 @@ func (q *Queries) DeleteStreams(ctx context.Context) error {
 	return err
 }
 
-const getAllBrotliBytesNotGzip = `-- name: GetAllBrotliBytesNotGzip :many
-SELECT
-  id, brotli_bytes
-FROM
-  streams
-WHERE
-  brotli_bytes IS NOT NULL AND gzipped_bytes IS NULL
-`
-
-type GetAllBrotliBytesNotGzipRow struct {
-	ID          uuid.UUID
-	BrotliBytes []byte
-}
-
-func (q *Queries) GetAllBrotliBytesNotGzip(ctx context.Context) ([]GetAllBrotliBytesNotGzipRow, error) {
-	rows, err := q.db.Query(ctx, getAllBrotliBytesNotGzip)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []GetAllBrotliBytesNotGzipRow
-	for rows.Next() {
-		var i GetAllBrotliBytesNotGzipRow
-		if err := rows.Scan(&i.ID, &i.BrotliBytes); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getAllGzippedBytesNotBrotli = `-- name: GetAllGzippedBytesNotBrotli :many
-SELECT
-  id, gzipped_bytes
-FROM
-  streams
-WHERE
-  gzipped_bytes IS NOT NULL AND brotli_bytes IS NULL
-`
-
-type GetAllGzippedBytesNotBrotliRow struct {
-	ID           uuid.UUID
-	GzippedBytes []byte
-}
-
-func (q *Queries) GetAllGzippedBytesNotBrotli(ctx context.Context) ([]GetAllGzippedBytesNotBrotliRow, error) {
-	rows, err := q.db.Query(ctx, getAllGzippedBytesNotBrotli)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []GetAllGzippedBytesNotBrotliRow
-	for rows.Next() {
-		var i GetAllGzippedBytesNotBrotliRow
-		if err := rows.Scan(&i.ID, &i.GzippedBytes); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getEverything = `-- name: GetEverything :many
 SELECT
-  id, streamer_id, stream_id, start_time, max_views, last_updated_at, streamer_login_at_start, language_at_start, title_at_start, game_name_at_start, recording_fetched_at, gzipped_bytes, brotli_bytes, hls_domain, bytes_found, public, sub_only, seek_previews_domain
+  id, streamer_id, stream_id, start_time, max_views, last_updated_at, streamer_login_at_start, language_at_start, title_at_start, game_name_at_start, recording_fetched_at, gzipped_bytes, hls_domain, bytes_found, public, sub_only, seek_previews_domain
 FROM
   streams s
 `
@@ -130,7 +62,6 @@ func (q *Queries) GetEverything(ctx context.Context) ([]Stream, error) {
 			&i.GameNameAtStart,
 			&i.RecordingFetchedAt,
 			&i.GzippedBytes,
-			&i.BrotliBytes,
 			&i.HlsDomain,
 			&i.BytesFound,
 			&i.Public,
@@ -422,36 +353,6 @@ func (q *Queries) GetLatestStreamsFromStreamerLogin(ctx context.Context, arg Get
 	return items, nil
 }
 
-const getStreamBrotliBytes = `-- name: GetStreamBrotliBytes :many
-SELECT
-  brotli_bytes
-FROM
-  streams
-WHERE
-  stream_id = $1
-LIMIT 1
-`
-
-func (q *Queries) GetStreamBrotliBytes(ctx context.Context, streamID string) ([][]byte, error) {
-	rows, err := q.db.Query(ctx, getStreamBrotliBytes, streamID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items [][]byte
-	for rows.Next() {
-		var brotli_bytes []byte
-		if err := rows.Scan(&brotli_bytes); err != nil {
-			return nil, err
-		}
-		items = append(items, brotli_bytes)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getStreamForEachStreamIdUnnest = `-- name: GetStreamForEachStreamIdUnnest :many
 WITH
   ids AS (SELECT unnest($1::TEXT[]) AS stream_id)
@@ -531,58 +432,6 @@ func (q *Queries) GetStreamGzippedBytes(ctx context.Context, streamID string) ([
 		return nil, err
 	}
 	return items, nil
-}
-
-const setBrotliBytes = `-- name: SetBrotliBytes :exec
-WITH 
-  input_bytes AS
-(SELECT
-  unnest($1::UUID[]) AS id,
-  unnest($2::BYTEA[]) AS brotli_bytes)
-UPDATE
-  streams
-SET
-  brotli_bytes = input_bytes.brotli_bytes
-FROM
-  input_bytes
-WHERE
-  streams.id = input_bytes.id
-`
-
-type SetBrotliBytesParams struct {
-	IDArr          []uuid.UUID
-	BrotliBytesArr [][]byte
-}
-
-func (q *Queries) SetBrotliBytes(ctx context.Context, arg SetBrotliBytesParams) error {
-	_, err := q.db.Exec(ctx, setBrotliBytes, arg.IDArr, arg.BrotliBytesArr)
-	return err
-}
-
-const setGzipBytes = `-- name: SetGzipBytes :exec
-WITH 
-  input_bytes AS
-(SELECT
-  unnest($1::UUID[]) AS id,
-  unnest($2::BYTEA[]) AS gzip_bytes)
-UPDATE
-  streams
-SET
-  gzipped_bytes = input_bytes.gzip_bytes
-FROM
-  input_bytes
-WHERE
-  streams.id = input_bytes.id
-`
-
-type SetGzipBytesParams struct {
-	IDArr        []uuid.UUID
-	GzipBytesArr [][]byte
-}
-
-func (q *Queries) SetGzipBytes(ctx context.Context, arg SetGzipBytesParams) error {
-	_, err := q.db.Exec(ctx, setGzipBytes, arg.IDArr, arg.GzipBytesArr)
-	return err
 }
 
 const updateRecording = `-- name: UpdateRecording :exec

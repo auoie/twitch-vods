@@ -12,7 +12,6 @@ CREATE TABLE "streams" (
     "game_name_at_start" TEXT NOT NULL,
     "recording_fetched_at" TIMESTAMP(3),
     "gzipped_bytes" BYTEA,
-    "brotli_bytes" BYTEA,
     "hls_domain" TEXT,
     "bytes_found" BOOLEAN,
     "public" BOOLEAN,

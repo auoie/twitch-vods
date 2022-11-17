@@ -7,15 +7,6 @@ WHERE
   stream_id = $1
 LIMIT 1;
 
--- name: GetStreamBrotliBytes :many
-SELECT
-  brotli_bytes
-FROM
-  streams
-WHERE
-  stream_id = $1
-LIMIT 1;
-
 -- name: GetStreamForEachStreamIdBatched :batchmany
 SELECT
   id, last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start
@@ -140,52 +131,6 @@ LIMIT $4;
 DELETE FROM streams
 WHERE 
   start_time < $1;
-
--- name: GetAllGzippedBytesNotBrotli :many
-SELECT
-  id, gzipped_bytes
-FROM
-  streams
-WHERE
-  gzipped_bytes IS NOT NULL AND brotli_bytes IS NULL;
-
--- name: GetAllBrotliBytesNotGzip :many
-SELECT
-  id, brotli_bytes
-FROM
-  streams
-WHERE
-  brotli_bytes IS NOT NULL AND gzipped_bytes IS NULL;
-
--- name: SetBrotliBytes :exec
-WITH 
-  input_bytes AS
-(SELECT
-  unnest(@id_arr::UUID[]) AS id,
-  unnest(@brotli_bytes_arr::BYTEA[]) AS brotli_bytes)
-UPDATE
-  streams
-SET
-  brotli_bytes = input_bytes.brotli_bytes
-FROM
-  input_bytes
-WHERE
-  streams.id = input_bytes.id;
-
--- name: SetGzipBytes :exec
-WITH 
-  input_bytes AS
-(SELECT
-  unnest(@id_arr::UUID[]) AS id,
-  unnest(@gzip_bytes_arr::BYTEA[]) AS gzip_bytes)
-UPDATE
-  streams
-SET
-  gzipped_bytes = input_bytes.gzip_bytes
-FROM
-  input_bytes
-WHERE
-  streams.id = input_bytes.id;
 
 -- name: GetEverything :many
 SELECT
