@@ -29,7 +29,7 @@ ORDER BY
   start_time DESC
 LIMIT 1)
 SELECT
-  id, last_updated_at, max_views, start_time, s.streamer_id, stream_id, streamer_login_at_start
+  id, last_updated_at, max_views, start_time, s.streamer_id, stream_id, streamer_login_at_start, game_name_at_start, bytes_found, public, hls_domain, seek_previews_domain, recording_fetched_at
 FROM
   streams s
 INNER JOIN

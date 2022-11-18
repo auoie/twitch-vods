@@ -14,6 +14,11 @@ import (
 	"github.com/julienschmidt/httprouter"
 )
 
+type TStreamResult struct {
+	Link     string
+	Metadata sqlvods.GetLatestStreamsFromStreamerLoginRow
+}
+
 func main() {
 	databaseUrl, ok := os.LookupEnv("DATABASE_URL")
 	if !ok {
@@ -67,7 +72,11 @@ func main() {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		bytes, err := json.Marshal(streams)
+		streamResults := []TStreamResult{}
+		for _, stream := range streams {
+			streamResults = append(streamResults, TStreamResult{Metadata: stream, Link: fmt.Sprint("/m3u8/", stream.StreamID, "/index.m3u8")})
+		}
+		bytes, err := json.Marshal(streamResults)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
