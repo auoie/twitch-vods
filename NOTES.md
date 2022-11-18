@@ -224,14 +224,106 @@ I'm guessing it failed because it might keep all of the gzipped bytes in memory.
 In order to update a bunch of rows using a subquery, see [here](https://stackoverflow.com/a/45465626).
 This seems like the most modern approach.
 
+## Pagination in Postgres
+
+I want to implement some kind of cursor based pagination.
+[This article](https://www.citusdata.com/blog/2016/03/30/five-ways-to-paginate/) describes some approaches.
+The limit-offset approach is the most naive, and the slowest.
+So if we want to have a list of pages like in old.reddit, it might be better to maintain an in-memory index and then this index to fetch with keyset pagination.
+
+Cursors seem complicated for me.
+
+I like the keyset pagination approach.
+The solution described in the article is too simple.
+
+For example, it looks like
+
+```sql
+CREATE INDEX "streams_bytes_found_recording_fetched_at_id_idx" ON "streams"("bytes_found", "recording_fetched_at", "id");
+
+SELECT
+  id, stream_id, recording_fetched_at
+FROM
+  streams
+WHERE
+  bytes_found = True
+  AND (recording_fetched_at, id) < ($1, $2)
+ORDER BY
+  bytes_found DESC, recording_fetched_at DESC, id DESC
+LIMIT 20;
+```
+
+I'm not sure if I can replace the order-by condition `bytes_found DESC, recording_fetched_at DESC, id DESC` with `recording_fetched_at DESC, id DESC` since the first value is fixed in the query.
+
+Here are some links.
+
+- https://use-the-index-luke.com/no-offset. This article gives a basic introduction to pagination in SQL.
+- https://use-the-index-luke.com/sql/partial-results/fetch-next-page. This gives a more in-depth explanation. In particular, the equivalent logical condition is not executed the same.
+- https://vladmihalcea.com/sql-seek-keyset-pagination/. I like how this article describes how to using the planning tool to assess the performance of a query.
+  I dislike how they say "row value expression is equivalent" to the expanded expression.
+  It is not executed the same. They are logically equivalent, but not functionally equivalent.
+- https://www.postgresql.org/message-id/20191117182408.GA13566@fetter.org.
+  This email exchange describes how they try to add support for reverse collation, to make keyset pagination cover more cases. It would be nice to do something like `(recording_fetched_at, DESC id) < ($1, $2)` so that I can use fewer indices, but that feature does not seem to exist.
+- https://stackoverflow.com/questions/58942808/how-to-keypaginate-uuid-in-postgresql and https://stackoverflow.com/questions/70519518/is-there-any-better-option-to-apply-pagination-without-applying-offset-in-sql-se.
+  These are just some stackoverflow links.
+
+I just tried it.
+
+- `bytes_found DESC, recording_fetched_at DESC, id DESC` is 0.01s.
+- `recording_fetched_at DESC, id DESC` is 0.01s.
+- `bytes_found DESC, recording_fetched_at DESC` is 0.01s.
+- `bytes_found, recording_fetched_at DESC, id DESC` is 0.2s.
+- `bytes_found, recording_fetched_at DESC` is 0.2s.
+
+Basically, I don't need to include `bytes_found`, but if I do include it, then it must follow the order of the index.
+
+We can use `EXPLAIN` to understand what a query is doing.
+See these links for explanation:
+
+- https://www.postgresql.org/docs/current/using-explain.html
+- https://scalegrid.io/blog/postgres-explain-cost/
+
+Running
+
+```sql
+EXPLAIN SELECT id, stream_id, recording_fetched_at, max_views, streamer_login_at_start FROM streams WHERE bytes_found = True AND (recording_fetched_at, id) < ('2022-11-15 08:17:47.118', 'fe5b6c61-bc22-41a5-9674-7d85055519fc') ORDER BY bytes_found DESC, recording_fetched_at DESC LIMIT 50;
+```
+
+```text
+Limit  (cost=0.42..79.89 rows=50 width=56)
+  ->  Index Scan Backward using streams_bytes_found_recording_fetched_at_id_idx on streams  (cost=0.42..104199.46 rows=65564 width=56)
+        Index Cond: ((bytes_found = true) AND (ROW(recording_fetched_at, id) < ROW('2022-11-15 08:17:47.118'::timestamp without time zone, 'fe5b6c61-bc22-41a5-9674-7d85055519fc'::uuid)))
+```
+
+So the estimated cost is 79.89.
+
+Running
+
+```sql
+EXPLAIN SELECT id, stream_id, recording_fetched_at, max_views, streamer_login_at_start FROM streams WHERE bytes_found = True AND (recording_fetched_at, id) < ('2022-11-15 08:17:47.118', 'fe5b6c61-bc22-41a5-9674-7d85055519fc') ORDER BY bytes_found, recording_fetched_at DESC LIMIT 50;
+```
+
+```text
+Limit  (cost=53488.54..53530.05 rows=50 width=56)
+  ->  Incremental Sort  (cost=53488.54..107877.63 rows=65522 width=56)
+        Sort Key: bytes_found, recording_fetched_at DESC
+        Presorted Key: bytes_found
+        ->  Index Scan using streams_bytes_found_recording_fetched_at_id_idx on streams  (cost=0.42..103711.77 rows=65522 width=56)
+              Index Cond: ((bytes_found = true) AND (ROW(recording_fetched_at, id) < ROW('2022-11-15 08:17:47.118'::timestamp without time zone, 'fe5b6c61-bc22-41a5-9674-7d85055519fc'::uuid)))
+```
+
 ## Twitch
 
 The Twitch GraphQL resolver for videos (in particular, past broadcasts) went down for a short period.
 I should not trust the graphql API to work all the time.
 
+## Compression
+
+I tried to migrate to Brotli compression.
+But `mpv` seems to not support it, so I will not be using it.
+
 ## TODO
 
-- Migrate to brotli compression instead
 - I'm maintaining an infinite for loop.
   I should check if all the goroutines are closed using some tool to inspect the program internals.
 - Return VOD to VODs list if it is still live using the GraphQL client to check.

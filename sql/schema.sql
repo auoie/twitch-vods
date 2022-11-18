@@ -53,3 +53,6 @@ CREATE INDEX "streams_sub_only_language_at_start_max_views_idx" ON "streams"("su
 
 -- CreateIndex
 CREATE INDEX "streams_sub_only_bytes_found_language_at_start_max_views_idx" ON "streams"("sub_only", "bytes_found", "language_at_start", "max_views" DESC);
+
+-- CreateIndex
+CREATE INDEX "streams_bytes_found_recording_fetched_at_id_idx" ON "streams"("bytes_found", "recording_fetched_at", "id");
