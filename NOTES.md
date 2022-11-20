@@ -324,6 +324,19 @@ But `mpv` seems to not support it, so I will not be using it.
 
 ## TODO
 
+- Some of the segments in some videos are not loading.
+  It seems like they are muted, but the m3u8 file did not include that information.
+  Maybe I should wait longer before fetching the video.
+  This [link](https://www.reddit.com/r/osugame/comments/2cvspn/just_a_heads_up_twitchtv_is_now_muting_all_vods/) seems to explain it.
+  I should add a queue in between the old vods queue and the live vods queue.
+  That queue should keep each video in for at least 30 minutes.
+  Additionally, I should remove the wait time for the live vods queue from 15 minutes to 10 minutes.
+  The initial vods queue should contain all the vods from the last `buffer_ratio * (old_vods_eviction_time + intermediate_queue_time)` minutes.
+  Also, I should allow an entry in the intermediate queue to be removed if an updated version is found in the live vods queue.
+  This will also solve my flooding problem mentioned below.
+- When I restart the scraper after 15 minutes, the old vods queue is flooded with all the the vods.
+  I should add a new separate field called `ScraperLastFetchedTime` that is set when I fetch from the database or from the Twitch GQL API.
+  This field should be used to evict from the database.
 - I'm maintaining an infinite for loop.
   I should check if all the goroutines are closed using some tool to inspect the program internals.
 - Return VOD to VODs list if it is still live using the GraphQL client to check.
