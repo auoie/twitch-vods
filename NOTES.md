@@ -312,31 +312,42 @@ Limit  (cost=53488.54..53530.05 rows=50 width=56)
               Index Cond: ((bytes_found = true) AND (ROW(recording_fetched_at, id) < ROW('2022-11-15 08:17:47.118'::timestamp without time zone, 'fe5b6c61-bc22-41a5-9674-7d85055519fc'::uuid)))
 ```
 
+Note that `NULL` is not included in Postgres indices.
+You must use something called a partial index to filter on `IS NULL` or `IS NOT NULL` efficiently.
+This is not supported in Prisma.
+So I'm just going with an additional boolean field to tell if an hls file fetch attempt has been made.
+
 ## Twitch
 
 The Twitch GraphQL resolver for videos (in particular, past broadcasts) went down for a short period.
 I should not trust the graphql API to work all the time.
+
+I need to guarantee that the time I fetch a VOD is at least 30 minutes after the VOD ends.
+This is because there seems to be a cron job (maybe a lambda service) that runs every 30 minutes to mute videos on the twitch servers.
+This is described [here](https://www.reddit.com/r/osugame/comments/2cvspn/just_a_heads_up_twitchtv_is_now_muting_all_vods/).
 
 ## Compression
 
 I tried to migrate to Brotli compression.
 But `mpv` seems to not support it, so I will not be using it.
 
+## Live Vod Queue
+
+Right now I have intermediate queue where everything is required to stay for 30 minutes, and I keep the live vod queue the at 5 minute intervals with VODs kept for 15 minutes.
+
+This approach saves time for SQL fetched vods.
+This will also solve my flooding problem after restarting.
+
+An alternative approach is to include a second last interacted with field.
+Then I only evict with this field is 45 minutes old.
+But this fails to include the case where a streamer restarts in the stream.
+
+
 ## TODO
 
-- Some of the segments in some videos are not loading.
-  It seems like they are muted, but the m3u8 file did not include that information.
-  Maybe I should wait longer before fetching the video.
-  This [link](https://www.reddit.com/r/osugame/comments/2cvspn/just_a_heads_up_twitchtv_is_now_muting_all_vods/) seems to explain it.
-  I should add a queue in between the old vods queue and the live vods queue.
-  That queue should keep each video in for at least 30 minutes.
-  Additionally, I should remove the wait time for the live vods queue from 15 minutes to 10 minutes.
-  The initial vods queue should contain all the vods from the last `buffer_ratio * (old_vods_eviction_time + intermediate_queue_time)` minutes.
-  Also, I should allow an entry in the intermediate queue to be removed if an updated version is found in the live vods queue.
-  This will also solve my flooding problem mentioned below.
-- When I restart the scraper after 15 minutes, the old vods queue is flooded with all the the vods.
-  I should add a new separate field called `ScraperLastFetchedTime` that is set when I fetch from the database or from the Twitch GQL API.
-  This field should be used to evict from the database.
+- Add additional required boolean field to tell if an hls fetch has been made.
+- Add game id to database.
+- Get streamer icon as well
 - I'm maintaining an infinite for loop.
   I should check if all the goroutines are closed using some tool to inspect the program internals.
 - Return VOD to VODs list if it is still live using the GraphQL client to check.

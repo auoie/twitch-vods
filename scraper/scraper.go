@@ -28,7 +28,8 @@ type LiveVod struct {
 	StartTime            time.Time
 	StreamerLoginAtStart string
 	MaxViews             int
-	LastUpdated          time.Time
+	LastUpdated          time.Time // time twitchgql request completed
+	LastInteraction      time.Time // last time interacted with (e.g. time twitchgql request completed or time sql fetch completed)
 
 	// At the moment, I don't do anything with this. Storing it would use up a lot of space.
 	// Should I serialize it with something like Protobuf and then GZIP it?
@@ -76,7 +77,8 @@ type fetchTwitchGqlForeverParams struct {
 	twitchGqlRequestTimeLimit time.Duration
 	twitchGqlFetcherDelay     time.Duration
 	cursorResetThreshold      time.Duration
-	oldVodEvictionThreshold   time.Duration
+	liveVodEvictionThreshold  time.Duration
+	waitVodEvictionThreshold  time.Duration
 	oldVodsCh                 chan []*LiveVod
 	minViewerCountToObserve   int
 	minViewerCountToRecord    int
@@ -88,12 +90,11 @@ type fetchTwitchGqlForeverParams struct {
 }
 
 func twitchGqlResponseToSqlParams(
-	streams []twitchgql.GetStreamsStreamsStreamConnectionEdgesStreamEdge,
+	streams []*twitchgql.GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStream,
 	responseReturnedTime time.Time,
 ) sqlvods.UpsertManyStreamsParams {
 	result := sqlvods.UpsertManyStreamsParams{}
-	for _, stream := range streams {
-		node := stream.Node
+	for _, node := range streams {
 		result.LastUpdatedAtArr = append(result.LastUpdatedAtArr, responseReturnedTime)
 		result.MaxViewsArr = append(result.MaxViewsArr, int64(node.ViewersCount))
 		result.StartTimeArr = append(result.StartTimeArr, node.CreatedAt)
@@ -111,6 +112,7 @@ func fetchTwitchGqlForever(params fetchTwitchGqlForeverParams) {
 	log.Println("Inside fetchTwitchGqlForever...")
 	log.Println(fmt.Sprint("Fetcher delay: ", params.twitchGqlFetcherDelay))
 	liveVodQueue := params.initialLiveVodQueue
+	waitVodQueue := CreateNewWaitVodsPriorityQueue()
 	twitchGqlTicker := time.NewTicker(params.twitchGqlFetcherDelay)
 	defer twitchGqlTicker.Stop()
 	cursor := ""
@@ -126,6 +128,7 @@ func fetchTwitchGqlForever(params fetchTwitchGqlForeverParams) {
 	prevEdges := []twitchgql.GetStreamsStreamsStreamConnectionEdgesStreamEdge{}
 	debugMod := 10
 	for {
+		// Wait until done are next ticker
 		select {
 		case <-params.ctx.Done():
 			return
@@ -133,21 +136,23 @@ func fetchTwitchGqlForever(params fetchTwitchGqlForeverParams) {
 		}
 		debugIndex++
 		debugQueueSizeStart := liveVodQueue.Size()
+		// Reset cursor if fetching for long time
 		if time.Now().UTC().After(resetCursorTimeout) {
 			log.Println(fmt.Sprint("Reset cursor because we've been fetching for: ", params.cursorResetThreshold))
 			resetCursor()
 		}
-
+		// Request live streams
 		requestCtx, requestCancel := context.WithTimeout(params.ctx, params.twitchGqlRequestTimeLimit)
 		streams, err := twitchgql.GetStreams(requestCtx, params.client, params.numStreamsPerRequest, cursor)
 		responseReturnedTime := time.Now().UTC()
 		requestCancel()
-
+		// If request failed, reset cursor
 		if err != nil {
 			resetCursor()
 			log.Println(fmt.Sprint("Twitch graphql client reported an error: ", err))
 			continue
 		}
+		// Get the next cursor and if there are no streams or no next page, reset cursor
 		edges := streams.Streams.Edges
 		if len(edges) == 0 {
 			log.Println("edges has length 0")
@@ -173,26 +178,69 @@ func fetchTwitchGqlForever(params fetchTwitchGqlForeverParams) {
 			}
 		}
 		prevEdges = edges
+		// Remove repeats from wait queue, upsert the min observe view count vods, and insert evicted vods into wait queue
+		numRemoved := 0
 		oldVods := []*LiveVod{}
 		allVodsLessThanMinViewerCount := true
-		highViewEdges := []twitchgql.GetStreamsStreamsStreamConnectionEdgesStreamEdge{}
+		highViewNodes := []*twitchgql.GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStream{}
 		for _, edge := range edges {
-			if edge.Node.ViewersCount < params.minViewerCountToObserve {
+			nodeClone := edge.Node
+			node := &nodeClone
+			if node.ViewersCount < params.minViewerCountToObserve {
 				continue
 			}
-			highViewEdges = append(highViewEdges, edge)
+			waitVod, err := waitVodQueue.GetByStreamId(node.Id)
+			if err == nil {
+				waitVodQueue.RemoveVod(waitVod)
+				liveVodQueue.UpsertLiveVod(waitVod)
+			}
+			highViewNodes = append(highViewNodes, node)
 			allVodsLessThanMinViewerCount = false
 			evictedVod, err := liveVodQueue.UpsertVod(
 				responseReturnedTime,
-				VodDataPoint{Node: &edge.Node, ResponseReturnedTime: responseReturnedTime},
+				VodDataPoint{Node: node, ResponseReturnedTime: responseReturnedTime},
 			)
 			if err != nil {
 				continue
 			}
 			log.Println("Streamer restarted stream: ", evictedVod.StreamerLoginAtStart)
-			oldVods = append(oldVods, evictedVod)
+			waitVodQueue.Put(evictedVod)
+			numRemoved++
 		}
-
+		if debugIndex%debugMod == 0 {
+			log.Println(fmt.Sprint("Live VOD queue size after upserts: ", liveVodQueue.Size()))
+		}
+		debugNumRestartedStreams := numRemoved
+		if debugNumRestartedStreams > 0 {
+			log.Println(fmt.Sprint("num restarted streams: ", debugNumRestartedStreams))
+		}
+		// If all vods are below minimum observe view count, reset cursor
+		if allVodsLessThanMinViewerCount {
+			log.Println("All vods less than min viewer count")
+			resetCursor()
+		}
+		// Evict vods with old last updated time and add vods to wait queue
+		oldestUpdateTimeAllowed := responseReturnedTime.Add(-params.liveVodEvictionThreshold)
+		for {
+			stalestVod, err := liveVodQueue.GetStalestStream()
+			if err != nil {
+				break
+			}
+			if stalestVod.LastUpdated.After(oldestUpdateTimeAllowed) {
+				break
+			}
+			liveVodQueue.RemoveVod(stalestVod)
+			waitVodQueue.Put(stalestVod)
+			numRemoved++
+		}
+		if debugIndex%debugMod == 0 {
+			log.Println(fmt.Sprint("Live VOD queue size after removing stale VODS: ", liveVodQueue.Size()))
+			log.Println(fmt.Sprint("Wait VOD queue size: ", waitVodQueue.Size()))
+		}
+		debugNumStaleVods := numRemoved - debugNumRestartedStreams
+		if debugNumStaleVods > 0 {
+			log.Println(fmt.Sprint("num stale vods: ", debugNumStaleVods))
+		}
 		// The queries to delete the old streams and upsert the new streams should be combined into a single transaction
 		requestCtx, requestCancel = context.WithTimeout(params.ctx, params.twitchGqlRequestTimeLimit)
 		err = params.queries.DeleteOldStreams(requestCtx, time.Now().UTC().Add(-params.oldVodsDelete))
@@ -202,45 +250,28 @@ func fetchTwitchGqlForever(params fetchTwitchGqlForeverParams) {
 			break
 		}
 		requestCtx, requestCancel = context.WithTimeout(params.ctx, params.twitchGqlRequestTimeLimit)
-		err = params.queries.UpsertManyStreams(requestCtx, twitchGqlResponseToSqlParams(highViewEdges, responseReturnedTime))
+		err = params.queries.UpsertManyStreams(requestCtx, twitchGqlResponseToSqlParams(highViewNodes, responseReturnedTime))
 		requestCancel()
 		if err != nil {
 			log.Println(fmt.Sprint("Upserting streams to streams table failed: ", err))
 			break
 		}
-
-		if debugIndex%debugMod == 0 {
-			log.Println(fmt.Sprint("Live VOD queue size after upserts: ", liveVodQueue.Size()))
-		}
-		debugNumRestartedStreams := len(oldVods)
-		if debugNumRestartedStreams > 0 {
-			log.Println(fmt.Sprint("num restarted streams: ", debugNumRestartedStreams))
-		}
-		if allVodsLessThanMinViewerCount {
-			log.Println("All vods less than min viewer count")
-			resetCursor()
-		}
-		oldestTimeAllowed := responseReturnedTime.Add(-params.oldVodEvictionThreshold)
+		// Evict vods with old last interaction time from wait vods queue and record iff at least record view count
+		oldestInteractionTimeAllowed := responseReturnedTime.Add(-params.waitVodEvictionThreshold)
 		for {
-			stalestVod, err := liveVodQueue.GetStalestStream()
+			stalestVod, err := waitVodQueue.GetStalestStream()
 			if err != nil {
 				break
 			}
-			if stalestVod.LastUpdated.After(oldestTimeAllowed) {
+			if stalestVod.LastInteraction.After(oldestInteractionTimeAllowed) {
 				break
 			}
-			liveVodQueue.RemoveVod(stalestVod)
+			waitVodQueue.RemoveVod(stalestVod)
 			if stalestVod.MaxViews >= params.minViewerCountToRecord {
 				oldVods = append(oldVods, stalestVod)
 			}
 		}
-		if debugIndex%debugMod == 0 {
-			log.Println(fmt.Sprint("Live VOD queue size after removing stale VODS: ", liveVodQueue.Size()))
-		}
-		debugNumStaleVods := len(oldVods) - debugNumRestartedStreams
-		if debugNumStaleVods > 0 {
-			log.Println(fmt.Sprint("num stale vods: ", debugNumStaleVods))
-		}
+		// Add old vods to old vods queue
 		select {
 		case <-params.ctx.Done():
 			return
@@ -485,7 +516,8 @@ func ScrapeTwitchLiveVodsWithGqlApi(ctx context.Context, params ScrapeTwitchLive
 			twitchGqlRequestTimeLimit: params.RequestTimeLimit,
 			twitchGqlFetcherDelay:     params.TwitchGqlFetcherDelay,
 			cursorResetThreshold:      params.CursorResetThreshold,
-			oldVodEvictionThreshold:   params.OldVodEvictionThreshold,
+			liveVodEvictionThreshold:  params.LiveVodEvictionThreshold,
+			waitVodEvictionThreshold:  params.WaitVodEvictionThreshold,
 			oldVodsCh:                 oldVodsCh,
 			minViewerCountToObserve:   params.MinViewerCountToObserve,
 			minViewerCountToRecord:    params.MinViewerCountToRecord,
@@ -564,8 +596,10 @@ type RunScraperParams struct {
 	TwitchGqlFetcherDelay time.Duration
 	// Time limit for .m3u8 and Twitch GQL requests. If this is exceeded in the TwithGQL loop, the for-loop continues. TODO: I should fix this.
 	RequestTimeLimit time.Duration
-	// If a VOD in the queue of live VODs is older than this, it is moved to the old VODs queue.
-	OldVodEvictionThreshold time.Duration
+	// If a VOD in the queue of live VODs has a last updated time older than this, it is moved out of the live VODs queue.
+	LiveVodEvictionThreshold time.Duration
+	// If a VOD in the queue of wait VODs has a last interaction time older than this, it is moved out of the wait VODs queue.
+	WaitVodEvictionThreshold time.Duration
 	// The queue of old VODs for fetching .m3u8 will never exceed this size. The VODs with the lowest view counts are evicted.
 	MaxOldVodsQueueSize int
 	// This is the number of goroutines fetching the .m3u8 files and compressing them.
@@ -591,7 +625,8 @@ type RunScraperParams struct {
 }
 
 // databaseUrl is the postgres database to connect to.
-// evictionRatio should be at least 1. We select live vods that were updated at most evictionRatio * oldVodEvictionThreshold ago before the newest live vod.
+// evictionRatio should be at least 1.
+// We select live vods that were updated at most evictionRatio * (liveVodEvictionThreshold + waitVodEvictionThreshold) ago before the newest live vod.
 // params are the parameters twitch graphql scraper.
 func RunScraper(ctx context.Context, databaseUrl string, evictionRatio float64, params RunScraperParams) error {
 	type tInitialState struct {
@@ -624,12 +659,13 @@ func RunScraper(ctx context.Context, databaseUrl string, evictionRatio float64, 
 			return &tInitialState{conn: conn, queries: queries, liveVodQueue: liveVodQueue}, nil
 		}
 		latestStream := latestStreams[0]
-		lastTimeAllowed := latestStream.LastUpdatedAt.Add(-time.Duration(float64(params.OldVodEvictionThreshold) * evictionRatio))
+		lastTimeAllowed := latestStream.LastUpdatedAt.Add(-time.Duration(float64(params.LiveVodEvictionThreshold+params.WaitVodEvictionThreshold) * evictionRatio))
 		latestLiveStreams, err := queries.GetLatestLiveStreams(ctx, lastTimeAllowed)
 		if err != nil {
 			conn.Close()
 			return nil, err
 		}
+		lastInteraction := time.Now().UTC()
 		for _, liveStream := range latestLiveStreams {
 			liveVodQueue.UpsertLiveVod(&LiveVod{
 				StreamerId:           liveStream.StreamerID,
@@ -638,6 +674,7 @@ func RunScraper(ctx context.Context, databaseUrl string, evictionRatio float64, 
 				StreamerLoginAtStart: liveStream.StreamerLoginAtStart,
 				MaxViews:             int(liveStream.MaxViews),
 				LastUpdated:          liveStream.LastUpdatedAt,
+				LastInteraction:      lastInteraction,
 			})
 		}
 		return &tInitialState{conn: conn, queries: queries, liveVodQueue: liveVodQueue}, nil

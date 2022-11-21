@@ -77,6 +77,7 @@ func (vods *liveVodsPriorityQueue) UpsertVod(curTime time.Time, data VodDataPoin
 		StreamerLoginAtStart: node.Broadcaster.Login,
 		MaxViews:             node.ViewersCount,
 		LastUpdated:          curTime,
+		LastInteraction:      curTime,
 	}
 	return vods.UpsertLiveVod(liveVod)
 }
@@ -91,20 +92,24 @@ func (vods *liveVodsPriorityQueue) UpsertLiveVod(liveVod *LiveVod) (*LiveVod, er
 	viewers := liveVod.MaxViews
 	curVod, ok := vods.streamerIdToVod[streamerId] // check if the streamer has an old stream
 	if !ok {
+		// This is a new stream and streamer doesn't have a stream in the queue
 		vods.lastUpdatedToVod.Put(liveVod.getLiveVodsKey(), liveVod)
 		vods.streamIdToVod[streamId] = liveVod
 		vods.streamerIdToVod[streamerId] = liveVod
 		return nil, errors.New("VOD is new")
 	} else if curVod.StartTime != startTime {
+		// This is a new stream and streamer has a stream in the queue
 		vods.RemoveVod(curVod)
 		vods.lastUpdatedToVod.Put(liveVod.getLiveVodsKey(), liveVod)
 		vods.streamIdToVod[streamId] = liveVod
 		vods.streamerIdToVod[streamerId] = liveVod
 		return curVod, nil
 	} else {
+		// This is an old stream
 		vods.RemoveVod(curVod)
 		curVod.MaxViews = getMax(viewers, curVod.MaxViews)
 		curVod.LastUpdated = liveVod.LastUpdated
+		curVod.LastInteraction = liveVod.LastInteraction
 		vods.lastUpdatedToVod.Put(curVod.getLiveVodsKey(), curVod)
 		vods.streamIdToVod[streamId] = curVod
 		vods.streamerIdToVod[streamerId] = curVod
