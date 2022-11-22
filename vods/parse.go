@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	firstnonerr "github.com/auoie/firstNonErr"
+	firstnonerr "github.com/auoie/first-nonerr"
 	"github.com/grafov/m3u8"
 )
 
