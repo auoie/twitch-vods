@@ -287,12 +287,12 @@ func GetMediaPlaylistDuration(mediapl *m3u8.MediaPlaylist) time.Duration {
 	return time.Duration(duration * float64(time.Second))
 }
 
-func GetValidSegments(mediapl *m3u8.MediaPlaylist) []*m3u8.MediaSegment {
+func GetValidSegments(mediapl *m3u8.MediaPlaylist, concurrent int) []*m3u8.MediaSegment {
 	urls := []string{}
 	for _, segment := range mediapl.Segments {
 		urls = append(urls, segment.URI)
 	}
-	sortedValidIndices := getSortedIndicesOfValidUrls(urls)
+	sortedValidIndices := getSortedIndicesOfValidUrls(urls, concurrent)
 	segments := []*m3u8.MediaSegment{}
 	for _, validIndex := range sortedValidIndices {
 		segments = append(segments, mediapl.Segments[validIndex])
@@ -300,8 +300,8 @@ func GetValidSegments(mediapl *m3u8.MediaPlaylist) []*m3u8.MediaSegment {
 	return segments
 }
 
-func GetMediaPlaylistWithValidSegments(rawPlaylist *m3u8.MediaPlaylist) (*m3u8.MediaPlaylist, error) {
-	validSegments := GetValidSegments(rawPlaylist)
+func GetMediaPlaylistWithValidSegments(rawPlaylist *m3u8.MediaPlaylist, concurrent int) (*m3u8.MediaPlaylist, error) {
+	validSegments := GetValidSegments(rawPlaylist, concurrent)
 	numValidSegments := uint(len(validSegments))
 	mediapl, err := m3u8.NewMediaPlaylist(rawPlaylist.WinSize(), numValidSegments)
 	if err != nil {
@@ -316,24 +316,61 @@ func GetMediaPlaylistWithValidSegments(rawPlaylist *m3u8.MediaPlaylist) (*m3u8.M
 	return mediapl, err
 }
 
-func getSortedIndicesOfValidUrls(urls []string) []int {
+const clearLine = "\033[2K"
+
+func getSortedIndicesOfValidUrls(urls []string, concurrent int) []int {
 	validIndices := []int{}
 	validIndicesCh := make(chan urlIndexResponse)
-	for index, url := range urls {
-		go func(index int, url string) {
-			if urlIsValid(url) {
-				validIndicesCh <- urlIndexResponse{index: index, valid: true}
-			} else {
-				validIndicesCh <- urlIndexResponse{index: index, valid: false}
+	requestIndicesCh := make(chan int)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	for i := 0; i < concurrent; i++ {
+		go func() {
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case requestIndex := <-requestIndicesCh:
+					url := urls[requestIndex]
+					valid := urlIsValid(url)
+					if valid {
+						validIndicesCh <- urlIndexResponse{index: requestIndex, valid: true}
+					} else {
+						validIndicesCh <- urlIndexResponse{index: requestIndex, valid: false}
+					}
+				}
 			}
-		}(index, url)
+		}()
 	}
+	go func() {
+		for i := 0; i < len(urls); i++ {
+			select {
+			case <-ctx.Done():
+				return
+			case requestIndicesCh <- i:
+			}
+		}
+	}()
+	doneCount := 0
 	for range urls {
-		response := <-validIndicesCh
-		if response.valid {
-			validIndices = append(validIndices, response.index)
+		done := false
+		select {
+		case <-ctx.Done():
+			done = true
+		case response := <-validIndicesCh:
+			doneCount++
+			fmt.Print(clearLine)
+			fmt.Print("\r")
+			fmt.Print(fmt.Sprint("Processed ", doneCount, " segments out of ", len(urls)))
+			if response.valid {
+				validIndices = append(validIndices, response.index)
+			}
+		}
+		if done {
+			break
 		}
 	}
+	fmt.Println()
 	sort.Slice(validIndices, func(i, j int) bool {
 		return validIndices[i] < validIndices[j]
 	})
