@@ -204,6 +204,7 @@ func fetchTwitchGqlForever(params fetchTwitchGqlForeverParams) {
 				continue
 			}
 			log.Println("Streamer restarted stream: ", evictedVod.StreamerLoginAtStart)
+			evictedVod.LastInteraction = responseReturnedTime
 			waitVodQueue.Put(evictedVod)
 			numRemoved++
 		}
@@ -230,6 +231,7 @@ func fetchTwitchGqlForever(params fetchTwitchGqlForeverParams) {
 				break
 			}
 			liveVodQueue.RemoveVod(stalestVod)
+			stalestVod.LastInteraction = responseReturnedTime
 			waitVodQueue.Put(stalestVod)
 			numRemoved++
 		}
