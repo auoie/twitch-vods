@@ -352,11 +352,11 @@ func getSortedIndicesOfValidUrls(urls []string, concurrent int) []int {
 		}
 	}()
 	doneCount := 0
+Loop:
 	for range urls {
-		done := false
 		select {
 		case <-ctx.Done():
-			done = true
+			break Loop
 		case response := <-validIndicesCh:
 			doneCount++
 			fmt.Print(clearLine)
@@ -365,9 +365,6 @@ func getSortedIndicesOfValidUrls(urls []string, concurrent int) []int {
 			if response.valid {
 				validIndices = append(validIndices, response.index)
 			}
-		}
-		if done {
-			break
 		}
 	}
 	fmt.Println()
