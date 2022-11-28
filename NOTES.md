@@ -345,8 +345,8 @@ But this fails to include the case where a streamer restarts in the stream.
 
 ## TODO
 
-- Add additional required boolean field to tell if an hls fetch has been made.
-- Add game id to database.
+- Get approximate video length calculated by last_updated_at - start_time
+- Get video length calculated by hls bytes
 - Get streamer icon as well
 - I'm maintaining an infinite for loop.
   I should check if all the goroutines are closed using some tool to inspect the program internals.

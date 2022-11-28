@@ -19,6 +19,7 @@ CREATE TABLE "streams" (
     "public" BOOLEAN,
     "sub_only" BOOLEAN,
     "seek_previews_domain" TEXT,
+    "hls_duration_seconds" DOUBLE PRECISION,
 
     CONSTRAINT "streams_pkey" PRIMARY KEY ("id")
 );

@@ -50,6 +50,7 @@ type VodResult struct {
 	SeekPreviewsDomain sql.NullString
 	Public             sql.NullBool
 	SubOnly            sql.NullBool
+	HlsDurationSeconds sql.NullFloat64
 }
 
 func edgeNodesMatchingAndNonEmpty(
@@ -357,7 +358,13 @@ func getCompressedBytes(bytes []byte, compressor *libdeflate.Compressor) ([]byte
 }
 
 // Find the .m3u8 for a video and return the compressed bytes.
-func getVodCompressedBytes(ctx context.Context, videoData *vods.VideoData, compressor *libdeflate.Compressor) ([]byte, *vods.DomainWithPath, error) {
+type vodCompressedBytesResult struct {
+	compressedBytes []byte
+	dwp             *vods.DomainWithPath
+	duration        time.Duration
+}
+
+func getVodCompressedBytes(ctx context.Context, videoData *vods.VideoData, compressor *libdeflate.Compressor) (*vodCompressedBytesResult, error) {
 	dwp, err := getFirstValidDwpResponse(ctx, videoData)
 	if err != nil {
 		dwp, err = getFirstValidDwpResponse(ctx, &vods.VideoData{
@@ -368,20 +375,21 @@ func getVodCompressedBytes(ctx context.Context, videoData *vods.VideoData, compr
 	}
 	if err != nil {
 		log.Println(fmt.Sprint("Link was not found for ", videoData.StreamerName, " because: ", err))
-		return nil, nil, err
+		return nil, err
 	}
 	mediapl, err := getCleanedMediaPlaylistBytes(dwp)
 	if err != nil {
 		log.Println(fmt.Sprint("Removing nil segments for ", videoData.StreamerName, " failed because: ", err))
 		log.Println(mediapl.String())
-		return nil, nil, err
+		return nil, err
 	}
+	duration := vods.GetMediaPlaylistDuration(mediapl)
 	compressedBytes, err := getCompressedBytes(mediapl.Encode().Bytes(), compressor)
 	if err != nil {
 		log.Println(fmt.Sprint("Compressing failed for ", videoData.StreamerName, " because: ", err))
-		return nil, nil, err
+		return nil, err
 	}
-	return compressedBytes, dwp.Dwp, nil
+	return &vodCompressedBytesResult{compressedBytes: compressedBytes, dwp: dwp.Dwp, duration: duration}, nil
 }
 
 type videoStatus struct {
@@ -446,7 +454,7 @@ func hlsWorkerFetchCompressSend(params hlsWorkerFetchCompressSendParams) {
 		}
 		requestCtx, cancel := context.WithTimeout(params.ctx, params.requestTimeLimit)
 		requestInitiated := time.Now().UTC()
-		bytes, dwp, err := getVodCompressedBytes(requestCtx, oldVod.GetVideoData(), params.compressor)
+		compressedBytesResult, err := getVodCompressedBytes(requestCtx, oldVod.GetVideoData(), params.compressor)
 		cancel()
 		var result *VodResult
 		if err != nil {
@@ -459,16 +467,24 @@ func hlsWorkerFetchCompressSend(params hlsWorkerFetchCompressSendParams) {
 					String: "",
 					Valid:  false,
 				},
+				HlsDurationSeconds: sql.NullFloat64{
+					Float64: 0.0,
+					Valid:   false,
+				},
 			}
 		} else {
 			result = &VodResult{
 				Vod:              oldVod,
-				HlsBytes:         bytes,
+				HlsBytes:         compressedBytesResult.compressedBytes,
 				HlsBytesFound:    true,
 				RequestInitiated: requestInitiated,
 				HlsDomain: sql.NullString{
-					String: dwp.Domain,
+					String: compressedBytesResult.dwp.Domain,
 					Valid:  true,
+				},
+				HlsDurationSeconds: sql.NullFloat64{
+					Float64: compressedBytesResult.duration.Seconds(),
+					Valid:   true,
 				},
 			}
 		}
@@ -576,6 +592,7 @@ func ScrapeTwitchLiveVodsWithGqlApi(ctx context.Context, params ScrapeTwitchLive
 				SeekPreviewsDomain: result.SeekPreviewsDomain,
 				Public:             result.Public,
 				SubOnly:            result.SubOnly,
+				HlsDurationSeconds: result.HlsDurationSeconds,
 			}
 			err := params.Queries.UpdateRecording(ctx, upsertRecordingParams)
 			if err != nil {

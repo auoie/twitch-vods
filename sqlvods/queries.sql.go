@@ -35,7 +35,7 @@ func (q *Queries) DeleteStreams(ctx context.Context) error {
 
 const getEverything = `-- name: GetEverything :many
 SELECT
-  id, streamer_id, stream_id, start_time, max_views, last_updated_at, streamer_login_at_start, language_at_start, title_at_start, game_name_at_start, game_id_at_start, is_mature_at_start, recording_fetched_at, gzipped_bytes, hls_domain, bytes_found, public, sub_only, seek_previews_domain
+  id, streamer_id, stream_id, start_time, max_views, last_updated_at, streamer_login_at_start, language_at_start, title_at_start, game_name_at_start, game_id_at_start, is_mature_at_start, recording_fetched_at, gzipped_bytes, hls_domain, bytes_found, public, sub_only, seek_previews_domain, hls_duration_seconds
 FROM
   streams s
 `
@@ -69,6 +69,7 @@ func (q *Queries) GetEverything(ctx context.Context) ([]Stream, error) {
 			&i.Public,
 			&i.SubOnly,
 			&i.SeekPreviewsDomain,
+			&i.HlsDurationSeconds,
 		); err != nil {
 			return nil, err
 		}
@@ -300,7 +301,7 @@ ORDER BY
   start_time DESC
 LIMIT 1)
 SELECT
-  id, last_updated_at, max_views, start_time, s.streamer_id, stream_id, streamer_login_at_start, game_name_at_start, bytes_found, public, sub_only, hls_domain, seek_previews_domain, recording_fetched_at
+  id, last_updated_at, max_views, title_at_start, start_time, s.streamer_id, stream_id, streamer_login_at_start, game_name_at_start, bytes_found, public, sub_only, hls_domain, hls_duration_seconds, seek_previews_domain, recording_fetched_at
 FROM
   streams s
 INNER JOIN
@@ -321,6 +322,7 @@ type GetLatestStreamsFromStreamerLoginRow struct {
 	ID                   uuid.UUID
 	LastUpdatedAt        time.Time
 	MaxViews             int64
+	TitleAtStart         string
 	StartTime            time.Time
 	StreamerID           string
 	StreamID             string
@@ -330,6 +332,7 @@ type GetLatestStreamsFromStreamerLoginRow struct {
 	Public               sql.NullBool
 	SubOnly              sql.NullBool
 	HlsDomain            sql.NullString
+	HlsDurationSeconds   sql.NullFloat64
 	SeekPreviewsDomain   sql.NullString
 	RecordingFetchedAt   sql.NullTime
 }
@@ -347,6 +350,7 @@ func (q *Queries) GetLatestStreamsFromStreamerLogin(ctx context.Context, arg Get
 			&i.ID,
 			&i.LastUpdatedAt,
 			&i.MaxViews,
+			&i.TitleAtStart,
 			&i.StartTime,
 			&i.StreamerID,
 			&i.StreamID,
@@ -356,6 +360,7 @@ func (q *Queries) GetLatestStreamsFromStreamerLogin(ctx context.Context, arg Get
 			&i.Public,
 			&i.SubOnly,
 			&i.HlsDomain,
+			&i.HlsDurationSeconds,
 			&i.SeekPreviewsDomain,
 			&i.RecordingFetchedAt,
 		); err != nil {
@@ -460,7 +465,8 @@ SET
   bytes_found = $5,
   seek_previews_domain = $6,
   public = $7,
-  sub_only = $8
+  sub_only = $8,
+  hls_duration_seconds = $9
 WHERE
   stream_id = $1
 `
@@ -474,6 +480,7 @@ type UpdateRecordingParams struct {
 	SeekPreviewsDomain sql.NullString
 	Public             sql.NullBool
 	SubOnly            sql.NullBool
+	HlsDurationSeconds sql.NullFloat64
 }
 
 func (q *Queries) UpdateRecording(ctx context.Context, arg UpdateRecordingParams) error {
@@ -486,6 +493,7 @@ func (q *Queries) UpdateRecording(ctx context.Context, arg UpdateRecordingParams
 		arg.SeekPreviewsDomain,
 		arg.Public,
 		arg.SubOnly,
+		arg.HlsDurationSeconds,
 	)
 	return err
 }

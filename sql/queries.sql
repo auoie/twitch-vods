@@ -29,7 +29,7 @@ ORDER BY
   start_time DESC
 LIMIT 1)
 SELECT
-  id, last_updated_at, max_views, start_time, s.streamer_id, stream_id, streamer_login_at_start, game_name_at_start, bytes_found, public, sub_only, hls_domain, seek_previews_domain, recording_fetched_at
+  id, last_updated_at, max_views, title_at_start, start_time, s.streamer_id, stream_id, streamer_login_at_start, game_name_at_start, bytes_found, public, sub_only, hls_domain, hls_duration_seconds, seek_previews_domain, recording_fetched_at
 FROM
   streams s
 INNER JOIN
@@ -114,7 +114,8 @@ SET
   bytes_found = $5,
   seek_previews_domain = $6,
   public = $7,
-  sub_only = $8
+  sub_only = $8,
+  hls_duration_seconds = $9
 WHERE
   stream_id = $1;
 

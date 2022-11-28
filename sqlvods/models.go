@@ -31,4 +31,5 @@ type Stream struct {
 	Public               sql.NullBool
 	SubOnly              sql.NullBool
 	SeekPreviewsDomain   sql.NullString
+	HlsDurationSeconds   sql.NullFloat64
 }
