@@ -74,6 +74,7 @@ ON CONFLICT
 DO
   UPDATE SET
     last_updated_at = EXCLUDED.last_updated_at,
+    last_updated_minus_start_time_seconds = EXCLUDED.last_updated_minus_start_time_seconds,
     max_views = GREATEST(streams.max_views, EXCLUDED.max_views);
 
 -- name: GetLatestStreamsFromStreamerId :many

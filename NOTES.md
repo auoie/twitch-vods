@@ -345,18 +345,16 @@ But this fails to include the case where a streamer restarts in the stream.
 
 ## TODO
 
-- Get approximate video length calculated by last_updated_at - start_time
-- Get video length calculated by hls bytes
+- When I turn on my VPN and turn if off, the Twitch GQL requests work but the cloudfront requests don't work.
+  I should try to understand why and fix it or find some way to handle this case.
+  In this case, a lot of VODS get the hls_domain fetched, but the sub_only and other fields are not fetched.
+  I should probably just keep restarting the scraper until it continues to work.
 - Get streamer icon as well
 - I'm maintaining an infinite for loop.
   I should check if all the goroutines are closed using some tool to inspect the program internals.
-- Return VOD to VODs list if it is still live using the GraphQL client to check.
-  Alternatively, when a live vod is fetched, check if it's in the old vod queue. If it's there, remove it from the old vod queue.
 - The m3u8 cloudfront links stopped working for about 5 minutes.
   As a result, like 60 public videos didn't have their m3u8 contents fetched.
   I'm not sure how to handle this.
-- When I turn on my VPN and turn if off, the Twitch GQL requests work but the cloudfront requests don't work.
-  I should try to understand why and fix it.
 - Print debugging statements and errors separately.
 - Add some private API so that I can configure the client ID and set of cloudfront domains at runtime.
   Maybe put these in a database so that I can retrieve them if the program restarts.
