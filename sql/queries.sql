@@ -29,7 +29,7 @@ ORDER BY
   start_time DESC
 LIMIT 1)
 SELECT
-  id, last_updated_at, max_views, title_at_start, start_time, s.streamer_id, stream_id, streamer_login_at_start, game_name_at_start, bytes_found, public, sub_only, hls_domain, hls_duration_seconds, seek_previews_domain, recording_fetched_at
+  *
 FROM
   streams s
 INNER JOIN
@@ -55,7 +55,7 @@ ON
 
 -- name: UpsertManyStreams :exec
 INSERT INTO
-  streams (last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start, is_mature_at_start, game_id_at_start)
+  streams (last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start, is_mature_at_start, game_id_at_start, last_updated_minus_start_time_seconds)
 SELECT
   unnest(@last_updated_at_arr::TIMESTAMP(3)[]) AS last_updated_at,
   unnest(@max_views_arr::BIGINT[]) AS max_views,
@@ -67,7 +67,8 @@ SELECT
   unnest(@language_at_start_arr::TEXT[]) AS language_at_start,
   unnest(@title_at_start_arr::TEXT[]) AS title_at_start,
   unnest(@is_mature_at_start_arr::BOOLEAN[]) AS is_mature_at_start,
-  unnest(@game_id_at_start::TEXT[]) AS game_id_at_start
+  unnest(@game_id_at_start_arr::TEXT[]) AS game_id_at_start,
+  unnest(@last_updated_minus_start_time_seconds_arr::DOUBLE PRECISION[]) AS last_updated_minus_start_time_seconds
 ON CONFLICT
   (stream_id)
 DO

@@ -4,18 +4,19 @@ datasource db {
 }
 
 model streams {
-  id                      String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  streamer_id             String
-  stream_id               String   @unique
-  start_time              DateTime
-  max_views               BigInt
-  last_updated_at         DateTime
-  streamer_login_at_start String
-  language_at_start       String
-  title_at_start          String
-  game_name_at_start      String
-  game_id_at_start        String
-  is_mature_at_start      Boolean
+  id                                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  streamer_id                           String
+  stream_id                             String   @unique
+  start_time                            DateTime
+  max_views                             BigInt
+  last_updated_at                       DateTime
+  streamer_login_at_start               String
+  language_at_start                     String
+  title_at_start                        String
+  game_name_at_start                    String
+  game_id_at_start                      String
+  is_mature_at_start                    Boolean
+  last_updated_minus_start_time_seconds Float
 
   recording_fetched_at DateTime?
   gzipped_bytes        Bytes?
@@ -31,7 +32,7 @@ model streams {
   @@index([start_time(sort: Desc)])
 
   @@index([bytes_found, recording_fetched_at, id])
-  
+
   @@index([max_views(sort: Desc)])
   @@index([bytes_found, max_views(sort: Desc)])
   @@index([sub_only, max_views(sort: Desc)])

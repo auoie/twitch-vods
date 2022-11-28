@@ -12,24 +12,25 @@ import (
 )
 
 type Stream struct {
-	ID                   uuid.UUID
-	StreamerID           string
-	StreamID             string
-	StartTime            time.Time
-	MaxViews             int64
-	LastUpdatedAt        time.Time
-	StreamerLoginAtStart string
-	LanguageAtStart      string
-	TitleAtStart         string
-	GameNameAtStart      string
-	GameIDAtStart        sql.NullString
-	IsMatureAtStart      sql.NullBool
-	RecordingFetchedAt   sql.NullTime
-	GzippedBytes         []byte
-	HlsDomain            sql.NullString
-	BytesFound           sql.NullBool
-	Public               sql.NullBool
-	SubOnly              sql.NullBool
-	SeekPreviewsDomain   sql.NullString
-	HlsDurationSeconds   sql.NullFloat64
+	ID                               uuid.UUID
+	StreamerID                       string
+	StreamID                         string
+	StartTime                        time.Time
+	MaxViews                         int64
+	LastUpdatedAt                    time.Time
+	StreamerLoginAtStart             string
+	LanguageAtStart                  string
+	TitleAtStart                     string
+	GameNameAtStart                  string
+	GameIDAtStart                    string
+	IsMatureAtStart                  bool
+	LastUpdatedMinusStartTimeSeconds float64
+	RecordingFetchedAt               sql.NullTime
+	GzippedBytes                     []byte
+	HlsDomain                        sql.NullString
+	BytesFound                       sql.NullBool
+	Public                           sql.NullBool
+	SubOnly                          sql.NullBool
+	SeekPreviewsDomain               sql.NullString
+	HlsDurationSeconds               sql.NullFloat64
 }
