@@ -35,7 +35,7 @@ func (q *Queries) DeleteStreams(ctx context.Context) error {
 
 const getEverything = `-- name: GetEverything :many
 SELECT
-  id, streamer_id, stream_id, start_time, max_views, last_updated_at, streamer_login_at_start, language_at_start, title_at_start, game_name_at_start, recording_fetched_at, gzipped_bytes, hls_domain, bytes_found, public, sub_only, seek_previews_domain
+  id, streamer_id, stream_id, start_time, max_views, last_updated_at, streamer_login_at_start, language_at_start, title_at_start, game_name_at_start, game_id_at_start, is_mature_at_start, recording_fetched_at, gzipped_bytes, hls_domain, bytes_found, public, sub_only, seek_previews_domain
 FROM
   streams s
 `
@@ -60,6 +60,8 @@ func (q *Queries) GetEverything(ctx context.Context) ([]Stream, error) {
 			&i.LanguageAtStart,
 			&i.TitleAtStart,
 			&i.GameNameAtStart,
+			&i.GameIDAtStart,
+			&i.IsMatureAtStart,
 			&i.RecordingFetchedAt,
 			&i.GzippedBytes,
 			&i.HlsDomain,
@@ -490,7 +492,7 @@ func (q *Queries) UpdateRecording(ctx context.Context, arg UpdateRecordingParams
 
 const upsertManyStreams = `-- name: UpsertManyStreams :exec
 INSERT INTO
-  streams (last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start)
+  streams (last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start, is_mature_at_start, game_id_at_start)
 SELECT
   unnest($1::TIMESTAMP(3)[]) AS last_updated_at,
   unnest($2::BIGINT[]) AS max_views,
@@ -500,7 +502,9 @@ SELECT
   unnest($6::TEXT[]) AS streamer_login_at_start,
   unnest($7::TEXT[]) AS game_name_at_start,
   unnest($8::TEXT[]) AS language_at_start,
-  unnest($9::TEXT[]) AS title_at_start
+  unnest($9::TEXT[]) AS title_at_start,
+  unnest($10::BOOLEAN[]) AS is_mature_at_start,
+  unnest($11::TEXT[]) AS game_id_at_start
 ON CONFLICT
   (stream_id)
 DO
@@ -519,6 +523,8 @@ type UpsertManyStreamsParams struct {
 	GameNameAtStartArr      []string
 	LanguageAtStartArr      []string
 	TitleAtStartArr         []string
+	IsMatureAtStartArr      []bool
+	GameIDAtStart           []string
 }
 
 func (q *Queries) UpsertManyStreams(ctx context.Context, arg UpsertManyStreamsParams) error {
@@ -532,6 +538,8 @@ func (q *Queries) UpsertManyStreams(ctx context.Context, arg UpsertManyStreamsPa
 		arg.GameNameAtStartArr,
 		arg.LanguageAtStartArr,
 		arg.TitleAtStartArr,
+		arg.IsMatureAtStartArr,
+		arg.GameIDAtStart,
 	)
 	return err
 }

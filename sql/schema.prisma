@@ -14,6 +14,8 @@ model streams {
   language_at_start       String
   title_at_start          String
   game_name_at_start      String
+  game_id_at_start        String
+  is_mature_at_start      Boolean
 
   recording_fetched_at DateTime?
   gzipped_bytes        Bytes?
@@ -26,9 +28,7 @@ model streams {
   @@index([streamer_id, start_time(sort: Desc)])
   @@index([streamer_login_at_start, start_time(sort: Desc)])
   @@index([start_time(sort: Desc)])
-
   @@index([bytes_found, recording_fetched_at, id])
-  
   @@index([max_views(sort: Desc)])
   @@index([bytes_found, max_views(sort: Desc)])
   @@index([sub_only, max_views(sort: Desc)])

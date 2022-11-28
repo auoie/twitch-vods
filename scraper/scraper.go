@@ -104,6 +104,8 @@ func twitchGqlResponseToSqlParams(
 		result.GameNameAtStartArr = append(result.GameNameAtStartArr, node.Game.Name)
 		result.LanguageAtStartArr = append(result.LanguageAtStartArr, string(node.Broadcaster.BroadcastSettings.Language))
 		result.TitleAtStartArr = append(result.TitleAtStartArr, node.Broadcaster.BroadcastSettings.Title)
+		result.GameIDAtStart = append(result.GameIDAtStart, node.Game.Id)
+		result.IsMatureAtStartArr = append(result.IsMatureAtStartArr, node.Broadcaster.BroadcastSettings.IsMature)
 	}
 	return result
 }

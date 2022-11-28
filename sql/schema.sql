@@ -10,6 +10,8 @@ CREATE TABLE "streams" (
     "language_at_start" TEXT NOT NULL,
     "title_at_start" TEXT NOT NULL,
     "game_name_at_start" TEXT NOT NULL,
+    "game_id_at_start" TEXT,
+    "is_mature_at_start" BOOLEAN,
     "recording_fetched_at" TIMESTAMP(3),
     "gzipped_bytes" BYTEA,
     "hls_domain" TEXT,

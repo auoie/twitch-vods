@@ -22,6 +22,8 @@ type Stream struct {
 	LanguageAtStart      string
 	TitleAtStart         string
 	GameNameAtStart      string
+	GameIDAtStart        sql.NullString
+	IsMatureAtStart      sql.NullBool
 	RecordingFetchedAt   sql.NullTime
 	GzippedBytes         []byte
 	HlsDomain            sql.NullString
