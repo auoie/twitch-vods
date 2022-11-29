@@ -505,6 +505,43 @@ func hlsWorkerFetchCompressSend(params hlsWorkerFetchCompressSendParams) {
 	}
 }
 
+func processVodResults(ctx context.Context, resultsCh chan *VodResult, done chan struct{}, queries *sqlvods.Queries) {
+	for {
+		var result *VodResult
+		select {
+		case result = <-resultsCh:
+		case <-ctx.Done():
+		}
+		if result == nil {
+			log.Println("ctx is done meaning result is nil, so breaking")
+			break
+		}
+		log.Println("Result was logged:")
+		log.Println(*result.Vod)
+		log.Println(fmt.Sprint("Gzipped size: ", len(result.HlsBytes)))
+		upsertRecordingParams := sqlvods.UpdateRecordingParams{
+			RecordingFetchedAt: sql.NullTime{Time: result.RequestInitiated, Valid: true},
+			GzippedBytes:       result.HlsBytes,
+			StreamID:           result.Vod.StreamId,
+			BytesFound:         sql.NullBool{Bool: result.HlsBytesFound, Valid: true},
+			HlsDomain:          result.HlsDomain,
+			SeekPreviewsDomain: result.SeekPreviewsDomain,
+			Public:             result.Public,
+			SubOnly:            result.SubOnly,
+			HlsDurationSeconds: result.HlsDurationSeconds,
+		}
+		err := queries.UpdateRecording(ctx, upsertRecordingParams)
+		if err != nil {
+			log.Println(fmt.Sprint("upserting recording failed: ", err))
+			break
+		}
+	}
+	select {
+	case <-ctx.Done():
+	case done <- struct{}{}:
+	}
+}
+
 type ScrapeTwitchLiveVodsWithGqlApiParams struct {
 	RunScraperParams
 	// initial live vod queue fetched from database
@@ -570,42 +607,7 @@ func ScrapeTwitchLiveVodsWithGqlApi(ctx context.Context, params ScrapeTwitchLive
 			requestTimeLimit: params.RequestTimeLimit,
 		})
 	}
-	go func() {
-		for {
-			var result *VodResult
-			select {
-			case result = <-resultsCh:
-			case <-ctx.Done():
-			}
-			if result == nil {
-				log.Println("ctx is done meaning result is nil, so breaking")
-				break
-			}
-			log.Println("Result was logged:")
-			log.Println(*result.Vod)
-			log.Println(fmt.Sprint("Gzipped size: ", len(result.HlsBytes)))
-			upsertRecordingParams := sqlvods.UpdateRecordingParams{
-				RecordingFetchedAt: sql.NullTime{Time: result.RequestInitiated, Valid: true},
-				GzippedBytes:       result.HlsBytes,
-				StreamID:           result.Vod.StreamId,
-				BytesFound:         sql.NullBool{Bool: result.HlsBytesFound, Valid: true},
-				HlsDomain:          result.HlsDomain,
-				SeekPreviewsDomain: result.SeekPreviewsDomain,
-				Public:             result.Public,
-				SubOnly:            result.SubOnly,
-				HlsDurationSeconds: result.HlsDurationSeconds,
-			}
-			err := params.Queries.UpdateRecording(ctx, upsertRecordingParams)
-			if err != nil {
-				log.Println(fmt.Sprint("upserting recording failed: ", err))
-				break
-			}
-		}
-		select {
-		case <-ctx.Done():
-		case done <- struct{}{}:
-		}
-	}()
+	go processVodResults(ctx, resultsCh, done, params.Queries)
 	select {
 	case <-done:
 	case <-ctx.Done():
