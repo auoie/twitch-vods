@@ -5,7 +5,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/auoie/goVods/scraper"
+	"github.com/auoie/twitchVods/scraper"
 )
 
 func main() {

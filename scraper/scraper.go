@@ -9,9 +9,9 @@ import (
 
 	"github.com/4kills/go-libdeflate/v2"
 	"github.com/Khan/genqlient/graphql"
-	"github.com/auoie/goVods/sqlvods"
-	"github.com/auoie/goVods/twitchgql"
 	"github.com/auoie/goVods/vods"
+	"github.com/auoie/twitchVods/sqlvods"
+	"github.com/auoie/twitchVods/twitchgql"
 	"github.com/grafov/m3u8"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/jdvr/go-again"

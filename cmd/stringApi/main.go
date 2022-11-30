@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/auoie/goVods/sqlvods"
+	"github.com/auoie/twitchVods/sqlvods"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/julienschmidt/httprouter"
 )
