@@ -342,13 +342,15 @@ An alternative approach is to include a second last interacted with field.
 Then I only evict with this field is 45 minutes old.
 But this fails to include the case where a streamer restarts in the stream.
 
-
 ## TODO
 
 - When I turn on my VPN and turn if off, the Twitch GQL requests work but the cloudfront requests don't work.
   I should try to understand why and fix it or find some way to handle this case.
   In this case, a lot of VODS get the hls_domain fetched, but the sub_only and other fields are not fetched.
   I should probably just keep restarting the scraper until it continues to work.
+  My solution will be to send vod results back into the old vod queue.
+  Keep count of how many times the twitch gql client failed in a row in the main loop.
+  If it exceeds 100, then break and restart.
 - Get streamer icon as well
 - I'm maintaining an infinite for loop.
   I should check if all the goroutines are closed using some tool to inspect the program internals.
