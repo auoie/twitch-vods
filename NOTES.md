@@ -326,6 +326,14 @@ I need to guarantee that the time I fetch a VOD is at least 30 minutes after the
 This is because there seems to be a cron job (maybe a lambda service) that runs every 30 minutes to mute videos on the twitch servers.
 This is described [here](https://www.reddit.com/r/osugame/comments/2cvspn/just_a_heads_up_twitchtv_is_now_muting_all_vods/).
 
+This is annoying.
+From `2022-12-01 08:57:50.429` to `2022-12-01 12:16:32.193`, a lot of the VODs just failed to fetch.
+I should add some interal API to retry those.
+7502 streams files were found.
+2421 were not found.
+This is 1500 more than average, so about 1500 streams failed out of around 10000.
+Maybe replace the old vods queue with Apache Kafka or something.
+
 ## Compression
 
 I tried to migrate to Brotli compression.

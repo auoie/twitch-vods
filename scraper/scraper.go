@@ -331,7 +331,13 @@ func processOldVodJobs(params processOldVodJobsParams) {
 }
 
 func getFirstValidDwpResponse(ctx context.Context, videoData *vods.VideoData) (*vods.ValidDwpResponse, error) {
-	dwp, err := vods.GetFirstValidDwp(ctx, videoData.GetDomainWithPathsList(vods.DOMAINS, 1))
+	domains := []string{}
+	// double so that if a link is valid, hopefully both don't fail
+	domains = append(domains, vods.DOMAINS...)
+	domains = append(domains, vods.DOMAINS...)
+	// shift in case video is off by second
+	shiftedVideoData := &vods.VideoData{StreamerName: videoData.StreamerName, VideoId: videoData.VideoId, Time: videoData.Time.Add(-time.Second)}
+	dwp, err := vods.GetFirstValidDwp(ctx, shiftedVideoData.GetDomainWithPathsList(domains, 2))
 	if err != nil {
 		return nil, err
 	}
@@ -367,13 +373,6 @@ type vodCompressedBytesResult struct {
 
 func getVodCompressedBytes(ctx context.Context, videoData *vods.VideoData, compressor *libdeflate.Compressor) (*vodCompressedBytesResult, error) {
 	dwp, err := getFirstValidDwpResponse(ctx, videoData)
-	if err != nil {
-		dwp, err = getFirstValidDwpResponse(ctx, &vods.VideoData{
-			StreamerName: videoData.StreamerName,
-			VideoId:      videoData.VideoId,
-			Time:         videoData.Time.Add(-time.Second),
-		})
-	}
 	if err != nil {
 		log.Println(fmt.Sprint("Link was not found for ", videoData.StreamerName, " because: ", err))
 		return nil, err
