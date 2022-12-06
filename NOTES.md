@@ -334,6 +334,11 @@ I should add some interal API to retry those.
 This is 1500 more than average, so about 1500 streams failed out of around 10000.
 Maybe replace the old vods queue with Apache Kafka or something.
 
+Multiple Twitch VODs can have the same stream id.
+This can happen, for example, if the streamer restarts the stream.
+In this case, the time is `time.Second()` rather than `time.Unix()`.
+So for a primary key for a stream, I should use the composit key `(start_time, stream_id)` rather than just `stream_id`.
+
 ## Compression
 
 I tried to migrate to Brotli compression.
@@ -349,6 +354,26 @@ This will also solve my flooding problem after restarting.
 An alternative approach is to include a second last interacted with field.
 Then I only evict with this field is 45 minutes old.
 But this fails to include the case where a streamer restarts in the stream.
+
+## Debugging
+
+All of the VODs older then `42 minutes + epsilon` should have `bytes_found` not be null.
+I don't know why this is not the case.
+Over `[now - 2 hrs, now - 1 hr]`, it's `3:3209`.
+Over `[now - 10 hrs, now - 1 hr]`, it's `2239:45139`.
+
+```SQL
+SELECT COUNT(*) FROM streams WHERE bytes_found IS NULL AND max_views >= 10 AND last_updated_at BETWEEN NOW() - INTERVAL '10 hours' AND NOW() - INTERVAL '1 hour';
+SELECT COUNT(*) FROM streams WHERE max_views >= 10 AND last_updated_at BETWEEN NOW() - INTERVAL '10 hours' AND NOW() - INTERVAL '1 hour';
+```
+
+Most of the VODs that are determined to be public should have `bytes_found = True`.
+Right now, it's a ratio of `0:29046`.
+
+```SQL
+SELECT COUNT(*) FROM streams WHERE public = True AND bytes_found IS NULL AND last_updated_at BETWEEN NOW() - INTERVAL '10 hours' AND NOW() - INTERVAL '1 hour';
+SELECT COUNT(*) FROM streams WHERE public = True AND last_updated_at BETWEEN NOW() - INTERVAL '10 hours' AND NOW() - INTERVAL '1 hour';
+```
 
 ## TODO
 
