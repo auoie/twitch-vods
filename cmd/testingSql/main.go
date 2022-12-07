@@ -66,9 +66,9 @@ var streams3 = []scraper.LiveVod{
 func getUpsertManyStreamsParams(streams []scraper.LiveVod) sqlvods.UpsertManyStreamsParams {
 	result := sqlvods.UpsertManyStreamsParams{}
 	for _, stream := range streams {
-		result.LastUpdatedAtArr = append(result.LastUpdatedAtArr, time.Unix(stream.LastUpdatedUnix, 0))
+		result.LastUpdatedAtArr = append(result.LastUpdatedAtArr, time.Unix(stream.LastUpdatedUnix, 0).UTC())
 		result.MaxViewsArr = append(result.MaxViewsArr, int64(stream.MaxViews))
-		result.StartTimeArr = append(result.StartTimeArr, time.Unix(stream.StartTimeUnix, 0))
+		result.StartTimeArr = append(result.StartTimeArr, time.Unix(stream.StartTimeUnix, 0).UTC())
 		result.StreamIDArr = append(result.StreamIDArr, stream.StreamId)
 		result.StreamerIDArr = append(result.StreamerIDArr, stream.StreamerId)
 		result.StreamerLoginAtStartArr = append(result.StreamerLoginAtStartArr, stream.StreamerLoginAtStart)

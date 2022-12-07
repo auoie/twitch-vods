@@ -38,7 +38,7 @@ type LiveVod struct {
 }
 
 func (vod *LiveVod) GetVideoData() *vods.VideoData {
-	return &vods.VideoData{StreamerName: vod.StreamerLoginAtStart, VideoId: vod.StreamId, Time: time.Unix(vod.StartTimeUnix, 0)}
+	return &vods.VideoData{StreamerName: vod.StreamerLoginAtStart, VideoId: vod.StreamId, Time: time.Unix(vod.StartTimeUnix, 0).UTC()}
 }
 
 type VodResult struct {
@@ -530,7 +530,7 @@ func processVodResults(ctx context.Context, resultsCh chan *VodResult, done chan
 			Public:             result.Public,
 			SubOnly:            result.SubOnly,
 			HlsDurationSeconds: result.HlsDurationSeconds,
-			StartTime:          time.Unix(result.Vod.StartTimeUnix, 0),
+			StartTime:          time.Unix(result.Vod.StartTimeUnix, 0).UTC(),
 		}
 		err := queries.UpdateRecording(ctx, upsertRecordingParams)
 		if err != nil {

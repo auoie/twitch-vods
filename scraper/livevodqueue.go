@@ -94,7 +94,7 @@ func (vods *liveVodsPriorityQueue) UpsertLiveVod(liveVod *LiveVod) (*LiveVod, er
 		return nil, errors.New("VOD is new")
 	} else if curVod.StartTimeUnix != startTimeUnix {
 		// This is a new stream and streamer has a stream in the queue
-		fmt.Println(fmt.Sprint("curVod.StartTime and startTime: ", time.Unix(curVod.StartTimeUnix, 0), " and ", time.Unix(startTimeUnix, 0)))
+		fmt.Println(fmt.Sprint("curVod.StartTime and startTime: ", time.Unix(curVod.StartTimeUnix, 0).UTC(), " and ", time.Unix(startTimeUnix, 0).UTC()))
 		vods.RemoveVod(curVod)
 		vods.lastUpdatedToVod.Put(liveVod.getLiveVodsKey(), liveVod)
 		vods.streamerIdToVod[streamerId] = liveVod
