@@ -337,6 +337,7 @@ Maybe replace the old vods queue with Apache Kafka or something.
 Multiple Twitch VODs can have the same stream id.
 This can happen, for example, if the streamer restarts the stream.
 In this case, the time is `time.Second()` rather than `time.Unix()`.
+In particular, see [this video](https://www.twitch.tv/videos/1671724933) from Twitch streamer `leagreasy`.
 So for a primary key for a stream, I should use the composit key `(start_time, stream_id)` rather than just `stream_id`.
 
 ## Compression
