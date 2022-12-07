@@ -73,7 +73,7 @@ func edgeNodesMatchingAndNonEmpty(
 
 type fetchTwitchGqlForeverParams struct {
 	ctx                       context.Context
-	initialLiveVodQueue       *liveVodsPriorityQueue
+	initialWaitVodQueue       *waitVodsPriorityQueue
 	client                    graphql.Client
 	twitchGqlRequestTimeLimit time.Duration
 	twitchGqlFetcherDelay     time.Duration
@@ -98,7 +98,7 @@ func twitchGqlResponseToSqlParams(
 	for _, node := range streams {
 		result.LastUpdatedAtArr = append(result.LastUpdatedAtArr, responseReturnedTime)
 		result.MaxViewsArr = append(result.MaxViewsArr, int64(node.ViewersCount))
-		result.StartTimeArr = append(result.StartTimeArr, node.CreatedAt)
+		result.StartTimeArr = append(result.StartTimeArr, node.CreatedAt.UTC())
 		result.StreamIDArr = append(result.StreamIDArr, node.Id)
 		result.StreamerIDArr = append(result.StreamerIDArr, node.Broadcaster.Id)
 		result.StreamerLoginAtStartArr = append(result.StreamerLoginAtStartArr, node.Broadcaster.Login)
@@ -107,7 +107,7 @@ func twitchGqlResponseToSqlParams(
 		result.TitleAtStartArr = append(result.TitleAtStartArr, node.Broadcaster.BroadcastSettings.Title)
 		result.GameIDAtStartArr = append(result.GameIDAtStartArr, node.Game.Id)
 		result.IsMatureAtStartArr = append(result.IsMatureAtStartArr, node.Broadcaster.BroadcastSettings.IsMature)
-		result.LastUpdatedMinusStartTimeSecondsArr = append(result.LastUpdatedMinusStartTimeSecondsArr, responseReturnedTime.Sub(node.CreatedAt).Seconds())
+		result.LastUpdatedMinusStartTimeSecondsArr = append(result.LastUpdatedMinusStartTimeSecondsArr, responseReturnedTime.Sub(node.CreatedAt.UTC()).Seconds())
 	}
 	return result
 }
@@ -115,8 +115,8 @@ func twitchGqlResponseToSqlParams(
 func fetchTwitchGqlForever(params fetchTwitchGqlForeverParams) {
 	log.Println("Inside fetchTwitchGqlForever...")
 	log.Println(fmt.Sprint("Fetcher delay: ", params.twitchGqlFetcherDelay))
-	liveVodQueue := params.initialLiveVodQueue
-	waitVodQueue := CreateNewWaitVodsPriorityQueue()
+	liveVodQueue := CreateNewLiveVodsPriorityQueue()
+	waitVodQueue := params.initialWaitVodQueue
 	twitchGqlTicker := time.NewTicker(params.twitchGqlFetcherDelay)
 	defer twitchGqlTicker.Stop()
 	cursor := ""
@@ -196,7 +196,7 @@ func fetchTwitchGqlForever(params fetchTwitchGqlForeverParams) {
 			}
 			highViewNodes = append(highViewNodes, node)
 			allVodsLessThanMinViewerCount = false
-			waitVod, err := waitVodQueue.GetByStreamIdStartTime(node.Id, node.CreatedAt.Unix())
+			waitVod, err := waitVodQueue.GetByStreamIdStartTime(node.Id, node.CreatedAt.UTC().Unix())
 			if err == nil {
 				log.Println(fmt.Sprint("Removing vod from wait queue: ", *waitVod))
 				waitVodQueue.RemoveVod(waitVod)
@@ -547,7 +547,7 @@ func processVodResults(ctx context.Context, resultsCh chan *VodResult, done chan
 type ScrapeTwitchLiveVodsWithGqlApiParams struct {
 	RunScraperParams
 	// initial live vod queue fetched from database
-	InitialLiveVodQueue *liveVodsPriorityQueue
+	InitialWaitVodQueue *waitVodsPriorityQueue
 	// sqlc queries instance
 	Queries *sqlvods.Queries
 }
@@ -572,7 +572,7 @@ func ScrapeTwitchLiveVodsWithGqlApi(ctx context.Context, params ScrapeTwitchLive
 		fetchTwitchGqlForeverParams{
 			ctx:                       ctx,
 			client:                    client,
-			initialLiveVodQueue:       params.InitialLiveVodQueue,
+			initialWaitVodQueue:       params.InitialWaitVodQueue,
 			twitchGqlRequestTimeLimit: params.RequestTimeLimit,
 			twitchGqlFetcherDelay:     params.TwitchGqlFetcherDelay,
 			cursorResetThreshold:      params.CursorResetThreshold,
@@ -658,7 +658,7 @@ func RunScraper(ctx context.Context, databaseUrl string, evictionRatio float64, 
 	type tInitialState struct {
 		conn         *pgxpool.Pool
 		queries      *sqlvods.Queries
-		liveVodQueue *liveVodsPriorityQueue
+		waitVodQueue *waitVodsPriorityQueue
 	}
 	getInitialState := func(ctx context.Context) (*tInitialState, error) {
 		conn, err := pgxpool.Connect(ctx, databaseUrl)
@@ -679,10 +679,10 @@ func RunScraper(ctx context.Context, databaseUrl string, evictionRatio float64, 
 			conn.Close()
 			return nil, err
 		}
-		liveVodQueue := CreateNewLiveVodsPriorityQueue()
+		waitVodQueue := CreateNewWaitVodsPriorityQueue()
 		if len(latestStreams) == 0 {
 			log.Println("there are 0 live vods")
-			return &tInitialState{conn: conn, queries: queries, liveVodQueue: liveVodQueue}, nil
+			return &tInitialState{conn: conn, queries: queries, waitVodQueue: waitVodQueue}, nil
 		}
 		latestStream := latestStreams[0]
 		lastTimeAllowed := latestStream.LastUpdatedAt.UTC().Add(-time.Duration(float64(params.LiveVodEvictionThreshold+params.WaitVodEvictionThreshold) * evictionRatio))
@@ -694,7 +694,7 @@ func RunScraper(ctx context.Context, databaseUrl string, evictionRatio float64, 
 		}
 		lastInteraction := time.Now().UTC()
 		for _, liveStream := range latestLiveStreams {
-			liveVodQueue.UpsertLiveVod(&LiveVod{
+			waitVodQueue.Put(&LiveVod{
 				StreamerId:           liveStream.StreamerID,
 				StreamId:             liveStream.StreamID,
 				StartTimeUnix:        liveStream.StartTime.UTC().Unix(),
@@ -704,7 +704,7 @@ func RunScraper(ctx context.Context, databaseUrl string, evictionRatio float64, 
 				LastInteractionUnix:  lastInteraction.Unix(),
 			})
 		}
-		return &tInitialState{conn: conn, queries: queries, liveVodQueue: liveVodQueue}, nil
+		return &tInitialState{conn: conn, queries: queries, waitVodQueue: waitVodQueue}, nil
 	}
 	initialState, err := again.Retry(ctx, getInitialState)
 	if err != nil {
@@ -712,12 +712,12 @@ func RunScraper(ctx context.Context, databaseUrl string, evictionRatio float64, 
 		return err
 	}
 	defer initialState.conn.Close()
-	log.Println(fmt.Sprint("entries in liveVodsQueue: ", initialState.liveVodQueue.Size()))
+	log.Println(fmt.Sprint("entries in waitVodsQueue: ", initialState.waitVodQueue.Size()))
 	return ScrapeTwitchLiveVodsWithGqlApi(
 		ctx,
 		ScrapeTwitchLiveVodsWithGqlApiParams{
 			RunScraperParams:    params,
-			InitialLiveVodQueue: initialState.liveVodQueue,
+			InitialWaitVodQueue: initialState.waitVodQueue,
 			Queries:             initialState.queries,
 		},
 	)

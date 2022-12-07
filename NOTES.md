@@ -378,6 +378,8 @@ SELECT COUNT(*) FROM streams WHERE public = True AND last_updated_at BETWEEN NOW
 
 ## TODO
 
+- On scraper restart, change from the live vod queue to a wait vod queue.
+  Right now, if a streamer has a stream in the wait vod queue and a stream in the live vod queue, the wait vod queue entry will be skipped.
 - When I turn on my VPN and turn if off, the Twitch GQL requests work but the cloudfront requests don't work.
   I should try to understand why and fix it or find some way to handle this case.
   In this case, a lot of VODS get the hls_domain fetched, but the sub_only and other fields are not fetched.

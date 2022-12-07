@@ -70,7 +70,7 @@ func (vods *liveVodsPriorityQueue) UpsertVod(data VodDataPoint) (*LiveVod, error
 	liveVod := &LiveVod{
 		StreamerId:           node.Broadcaster.Id,
 		StreamId:             node.Id,
-		StartTimeUnix:        node.CreatedAt.Unix(),
+		StartTimeUnix:        node.CreatedAt.UTC().Unix(),
 		StreamerLoginAtStart: node.Broadcaster.Login,
 		MaxViews:             node.ViewersCount,
 		LastUpdatedUnix:      data.ResponseReturnedTimeUnix,
