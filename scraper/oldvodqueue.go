@@ -61,3 +61,11 @@ func (vods *oldVodsPriorityQueue) PopHighViewCount() (*LiveVod, error) {
 	vods.tree.Remove(vod.getOldVodKey())
 	return vod, nil
 }
+
+func (vods *oldVodsPriorityQueue) GetHighViewCount() (*LiveVod, error) {
+	_, vod := vods.tree.Max()
+	if vod == nil {
+		return nil, errors.New("tree is empty")
+	}
+	return vod, nil
+}

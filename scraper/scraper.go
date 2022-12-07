@@ -307,7 +307,7 @@ func processOldVodJobs(params processOldVodJobsParams) {
 		return params.oldVodJobsCh
 	}
 	getNextInQueue := func() *LiveVod {
-		oldVod, _ := oldVodsOrderedByViews.PopHighViewCount()
+		oldVod, _ := oldVodsOrderedByViews.GetHighViewCount()
 		return oldVod
 	}
 	debugCount := -1
@@ -327,6 +327,7 @@ func processOldVodJobs(params processOldVodJobsParams) {
 				}
 			}
 		case getJobsCh() <- getNextInQueue():
+			oldVodsOrderedByViews.PopHighViewCount()
 		}
 	}
 }
