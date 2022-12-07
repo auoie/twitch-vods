@@ -18,18 +18,18 @@ import (
 )
 
 type VodDataPoint struct {
-	ResponseReturnedTime time.Time
-	Node                 twitchgql.VodNode
+	ResponseReturnedTimeUnix int64
+	Node                     twitchgql.VodNode
 }
 
 type LiveVod struct {
 	StreamerId           string
 	StreamId             string
-	StartTime            time.Time
+	StartTimeUnix        int64
 	StreamerLoginAtStart string
 	MaxViews             int
-	LastUpdated          time.Time // time twitchgql request completed
-	LastInteraction      time.Time // last time interacted with (e.g. time twitchgql request completed or time sql fetch completed)
+	LastUpdatedUnix      int64 // time twitchgql request completed
+	LastInteractionUnix  int64 // last time interacted with (e.g. time twitchgql request completed or time sql fetch completed)
 
 	// At the moment, I don't do anything with this. Storing it would use up a lot of space.
 	// Should I serialize it with something like Protobuf and then GZIP it?
@@ -38,7 +38,7 @@ type LiveVod struct {
 }
 
 func (vod *LiveVod) GetVideoData() *vods.VideoData {
-	return &vods.VideoData{StreamerName: vod.StreamerLoginAtStart, VideoId: vod.StreamId, Time: vod.StartTime}
+	return &vods.VideoData{StreamerName: vod.StreamerLoginAtStart, VideoId: vod.StreamId, Time: time.Unix(vod.StartTimeUnix, 0)}
 }
 
 type VodResult struct {
@@ -149,6 +149,7 @@ func fetchTwitchGqlForever(params fetchTwitchGqlForeverParams) {
 		requestCtx, requestCancel := context.WithTimeout(params.ctx, params.twitchGqlRequestTimeLimit)
 		streams, err := twitchgql.GetStreams(requestCtx, params.client, params.numStreamsPerRequest, cursor)
 		responseReturnedTime := time.Now().UTC()
+		responseReturnedTimeUnix := responseReturnedTime.Unix()
 		requestCancel()
 		// If request failed, reset cursor
 		if err != nil {
@@ -195,20 +196,20 @@ func fetchTwitchGqlForever(params fetchTwitchGqlForeverParams) {
 			}
 			highViewNodes = append(highViewNodes, node)
 			allVodsLessThanMinViewerCount = false
-			waitVod, err := waitVodQueue.GetByStreamIdStartTime(node.Id, node.CreatedAt)
+			waitVod, err := waitVodQueue.GetByStreamIdStartTime(node.Id, node.CreatedAt.Unix())
 			if err == nil {
 				log.Println(fmt.Sprint("Removing vod from wait queue: ", *waitVod))
 				waitVodQueue.RemoveVod(waitVod)
 				liveVodQueue.UpsertLiveVod(waitVod)
 			}
 			evictedVod, err := liveVodQueue.UpsertVod(
-				VodDataPoint{Node: node, ResponseReturnedTime: responseReturnedTime},
+				VodDataPoint{Node: node, ResponseReturnedTimeUnix: responseReturnedTimeUnix},
 			)
 			if err != nil {
 				continue
 			}
 			log.Println("Streamer restarted stream: ", evictedVod.StreamerLoginAtStart)
-			evictedVod.LastInteraction = responseReturnedTime
+			evictedVod.LastInteractionUnix = responseReturnedTimeUnix
 			waitVodQueue.Put(evictedVod)
 			numRemoved++
 		}
@@ -225,17 +226,17 @@ func fetchTwitchGqlForever(params fetchTwitchGqlForeverParams) {
 			resetCursor()
 		}
 		// Evict vods with old last updated time and add vods to wait queue
-		oldestUpdateTimeAllowed := responseReturnedTime.Add(-params.liveVodEvictionThreshold)
+		oldestUpdateTimeAllowedUnix := responseReturnedTime.Add(-params.liveVodEvictionThreshold).Unix()
 		for {
 			stalestVod, err := liveVodQueue.GetStalestStream()
 			if err != nil {
 				break
 			}
-			if stalestVod.LastUpdated.After(oldestUpdateTimeAllowed) {
+			if stalestVod.LastUpdatedUnix > oldestUpdateTimeAllowedUnix {
 				break
 			}
 			liveVodQueue.RemoveVod(stalestVod)
-			stalestVod.LastInteraction = responseReturnedTime
+			stalestVod.LastInteractionUnix = responseReturnedTimeUnix
 			waitVodQueue.Put(stalestVod)
 			numRemoved++
 		}
@@ -263,13 +264,13 @@ func fetchTwitchGqlForever(params fetchTwitchGqlForeverParams) {
 			break
 		}
 		// Evict vods with old last interaction time from wait vods queue and record iff at least record view count
-		oldestInteractionTimeAllowed := responseReturnedTime.Add(-params.waitVodEvictionThreshold)
+		oldestInteractionTimeAllowedUnix := responseReturnedTime.Add(-params.waitVodEvictionThreshold).Unix()
 		for {
 			stalestVod, err := waitVodQueue.GetStalestStream()
 			if err != nil {
 				break
 			}
-			if stalestVod.LastInteraction.After(oldestInteractionTimeAllowed) {
+			if stalestVod.LastInteractionUnix > oldestInteractionTimeAllowedUnix {
 				break
 			}
 			waitVodQueue.RemoveVod(stalestVod)
@@ -529,7 +530,7 @@ func processVodResults(ctx context.Context, resultsCh chan *VodResult, done chan
 			Public:             result.Public,
 			SubOnly:            result.SubOnly,
 			HlsDurationSeconds: result.HlsDurationSeconds,
-			StartTime:          result.Vod.StartTime,
+			StartTime:          time.Unix(result.Vod.StartTimeUnix, 0),
 		}
 		err := queries.UpdateRecording(ctx, upsertRecordingParams)
 		if err != nil {
@@ -695,11 +696,11 @@ func RunScraper(ctx context.Context, databaseUrl string, evictionRatio float64, 
 			liveVodQueue.UpsertLiveVod(&LiveVod{
 				StreamerId:           liveStream.StreamerID,
 				StreamId:             liveStream.StreamID,
-				StartTime:            liveStream.StartTime,
+				StartTimeUnix:        liveStream.StartTime.Unix(),
 				StreamerLoginAtStart: liveStream.StreamerLoginAtStart,
 				MaxViews:             int(liveStream.MaxViews),
-				LastUpdated:          liveStream.LastUpdatedAt,
-				LastInteraction:      lastInteraction,
+				LastUpdatedUnix:      liveStream.LastUpdatedAt.Unix(),
+				LastInteractionUnix:  lastInteraction.Unix(),
 			})
 		}
 		return &tInitialState{conn: conn, queries: queries, liveVodQueue: liveVodQueue}, nil

@@ -2,25 +2,24 @@ package scraper
 
 import (
 	"errors"
-	"time"
 
 	"github.com/monitor1379/yagods/maps/treemap"
 	"github.com/monitor1379/yagods/utils"
 )
 
 func (vod *LiveVod) getWaitVodsKey() *waitVodKey {
-	return &waitVodKey{lastInteraction: vod.LastInteraction, streamId: vod.StreamId, startTime: vod.StartTime}
+	return &waitVodKey{lastInteractionUnix: vod.LastInteractionUnix, streamId: vod.StreamId, startTimeUnix: vod.StartTimeUnix}
 }
 
 type waitVodKey struct {
-	lastInteraction time.Time
-	streamId        string
-	startTime       time.Time
+	lastInteractionUnix int64
+	streamId            string
+	startTimeUnix       int64
 }
 
 type streamIdStartTime struct {
-	streamId  string
-	startTime time.Time
+	streamId      string
+	startTimeUnix int64
 }
 
 type waitVodsPriorityQueue struct {
@@ -34,7 +33,7 @@ func CreateNewWaitVodsPriorityQueue() *waitVodsPriorityQueue {
 	return &waitVodsPriorityQueue{
 		streamIdToVod: map[streamIdStartTime]*LiveVod{},
 		lastInteractionToVod: treemap.NewWith[*waitVodKey, *LiveVod](func(a, b *waitVodKey) int {
-			dif := utils.TimeComparator(a.lastInteraction, b.lastInteraction)
+			dif := utils.NumberComparator(a.lastInteractionUnix, b.lastInteractionUnix)
 			if dif != 0 {
 				return dif
 			}
@@ -42,7 +41,7 @@ func CreateNewWaitVodsPriorityQueue() *waitVodsPriorityQueue {
 			if dif != 0 {
 				return dif
 			}
-			return utils.TimeComparator(a.startTime, b.startTime)
+			return utils.NumberComparator(a.startTimeUnix, b.startTimeUnix)
 		}),
 	}
 }
@@ -59,16 +58,16 @@ func (vods *waitVodsPriorityQueue) GetStalestStream() (*LiveVod, error) {
 	return vod, nil
 }
 
-func (vods *waitVodsPriorityQueue) DeleteByStreamIdStartTime(streamId string, startTime time.Time) {
-	curVod, ok := vods.streamIdToVod[streamIdStartTime{streamId, startTime}]
+func (vods *waitVodsPriorityQueue) DeleteByStreamIdStartTime(streamId string, startTimeUnix int64) {
+	curVod, ok := vods.streamIdToVod[streamIdStartTime{streamId, startTimeUnix}]
 	if !ok {
 		return
 	}
 	vods.RemoveVod(curVod)
 }
 
-func (vods *waitVodsPriorityQueue) GetByStreamIdStartTime(streamId string, startTime time.Time) (*LiveVod, error) {
-	curVod, ok := vods.streamIdToVod[streamIdStartTime{streamId, startTime}]
+func (vods *waitVodsPriorityQueue) GetByStreamIdStartTime(streamId string, startTimeUnix int64) (*LiveVod, error) {
+	curVod, ok := vods.streamIdToVod[streamIdStartTime{streamId, startTimeUnix}]
 	if !ok {
 		return nil, errors.New("not present")
 	}
@@ -77,14 +76,14 @@ func (vods *waitVodsPriorityQueue) GetByStreamIdStartTime(streamId string, start
 
 func (vods *waitVodsPriorityQueue) RemoveVod(vod *LiveVod) {
 	vods.lastInteractionToVod.Remove(vod.getWaitVodsKey())
-	delete(vods.streamIdToVod, streamIdStartTime{streamId: vod.StreamId, startTime: vod.StartTime})
+	delete(vods.streamIdToVod, streamIdStartTime{streamId: vod.StreamId, startTimeUnix: vod.StartTimeUnix})
 }
 
 // Parameters are the information for the VOD.
 // Returns nil error iff new VOD evicts an older VOD.
 // In the above case, the returned VOD will be the evicted VOD.
 func (vods *waitVodsPriorityQueue) Put(liveVod *LiveVod) {
-	vods.DeleteByStreamIdStartTime(liveVod.StreamId, liveVod.StartTime)
-	vods.streamIdToVod[streamIdStartTime{streamId: liveVod.StreamId, startTime: liveVod.StartTime}] = liveVod
+	vods.DeleteByStreamIdStartTime(liveVod.StreamId, liveVod.StartTimeUnix)
+	vods.streamIdToVod[streamIdStartTime{streamId: liveVod.StreamId, startTimeUnix: liveVod.StartTimeUnix}] = liveVod
 	vods.lastInteractionToVod.Put(liveVod.getWaitVodsKey(), liveVod)
 }

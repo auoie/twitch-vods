@@ -15,7 +15,7 @@ func main() {
 	}
 	scraper.RunScraperForever(
 		context.Background(),
-		24*time.Hour*30,
+		24*time.Hour*7,
 		databaseUrl,
 		2.0,
 		scraper.RunScraperParams{

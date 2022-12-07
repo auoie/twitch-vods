@@ -17,12 +17,12 @@ func getMax(a, b int) int {
 }
 
 func (vod *LiveVod) getLiveVodsKey() *liveVodKey {
-	return &liveVodKey{lastUpdated: vod.LastUpdated, streamId: vod.StreamId}
+	return &liveVodKey{lastUpdatedUnix: vod.LastUpdatedUnix, streamId: vod.StreamId}
 }
 
 type liveVodKey struct {
-	lastUpdated time.Time
-	streamId    string
+	lastUpdatedUnix int64
+	streamId        string
 }
 
 type liveVodsPriorityQueue struct {
@@ -36,7 +36,7 @@ func CreateNewLiveVodsPriorityQueue() *liveVodsPriorityQueue {
 	return &liveVodsPriorityQueue{
 		streamerIdToVod: map[string]*LiveVod{},
 		lastUpdatedToVod: treemap.NewWith[*liveVodKey, *LiveVod](func(a, b *liveVodKey) int {
-			dif := utils.TimeComparator(a.lastUpdated, b.lastUpdated)
+			dif := utils.NumberComparator(a.lastUpdatedUnix, b.lastUpdatedUnix)
 			if dif != 0 {
 				return dif
 			}
@@ -70,11 +70,11 @@ func (vods *liveVodsPriorityQueue) UpsertVod(data VodDataPoint) (*LiveVod, error
 	liveVod := &LiveVod{
 		StreamerId:           node.Broadcaster.Id,
 		StreamId:             node.Id,
-		StartTime:            node.CreatedAt,
+		StartTimeUnix:        node.CreatedAt.Unix(),
 		StreamerLoginAtStart: node.Broadcaster.Login,
 		MaxViews:             node.ViewersCount,
-		LastUpdated:          data.ResponseReturnedTime,
-		LastInteraction:      data.ResponseReturnedTime,
+		LastUpdatedUnix:      data.ResponseReturnedTimeUnix,
+		LastInteractionUnix:  data.ResponseReturnedTimeUnix,
 	}
 	return vods.UpsertLiveVod(liveVod)
 }
@@ -84,7 +84,7 @@ func (vods *liveVodsPriorityQueue) UpsertVod(data VodDataPoint) (*LiveVod, error
 // In the above case, the returned VOD will be the evicted VOD.
 func (vods *liveVodsPriorityQueue) UpsertLiveVod(liveVod *LiveVod) (*LiveVod, error) {
 	streamerId := liveVod.StreamerId
-	startTime := liveVod.StartTime
+	startTimeUnix := liveVod.StartTimeUnix
 	viewers := liveVod.MaxViews
 	curVod, ok := vods.streamerIdToVod[streamerId] // check if the streamer has an old stream
 	if !ok {
@@ -92,9 +92,9 @@ func (vods *liveVodsPriorityQueue) UpsertLiveVod(liveVod *LiveVod) (*LiveVod, er
 		vods.lastUpdatedToVod.Put(liveVod.getLiveVodsKey(), liveVod)
 		vods.streamerIdToVod[streamerId] = liveVod
 		return nil, errors.New("VOD is new")
-	} else if curVod.StartTime != startTime {
+	} else if curVod.StartTimeUnix != startTimeUnix {
 		// This is a new stream and streamer has a stream in the queue
-		fmt.Println(fmt.Sprint("curVod.StartTime and startTime: ", curVod.StartTime, startTime))
+		fmt.Println(fmt.Sprint("curVod.StartTime and startTime: ", time.Unix(curVod.StartTimeUnix, 0), " and ", time.Unix(startTimeUnix, 0)))
 		vods.RemoveVod(curVod)
 		vods.lastUpdatedToVod.Put(liveVod.getLiveVodsKey(), liveVod)
 		vods.streamerIdToVod[streamerId] = liveVod
@@ -103,8 +103,8 @@ func (vods *liveVodsPriorityQueue) UpsertLiveVod(liveVod *LiveVod) (*LiveVod, er
 		// This is an old stream
 		vods.RemoveVod(curVod)
 		curVod.MaxViews = getMax(viewers, curVod.MaxViews)
-		curVod.LastUpdated = liveVod.LastUpdated
-		curVod.LastInteraction = liveVod.LastInteraction
+		curVod.LastUpdatedUnix = liveVod.LastUpdatedUnix
+		curVod.LastInteractionUnix = liveVod.LastInteractionUnix
 		vods.lastUpdatedToVod.Put(curVod.getLiveVodsKey(), curVod)
 		vods.streamerIdToVod[streamerId] = curVod
 		return nil, errors.New("VOD exists and has been updated")

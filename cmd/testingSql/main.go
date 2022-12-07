@@ -16,10 +16,10 @@ func createLiveVod(id int) scraper.LiveVod {
 	return scraper.LiveVod{
 		StreamerId:           fmt.Sprint("streamerid", id),
 		StreamId:             fmt.Sprint("streamid", id),
-		StartTime:            time.Now().Add(-60 * time.Minute),
+		StartTimeUnix:        time.Now().Add(-60 * time.Minute).Unix(),
 		StreamerLoginAtStart: fmt.Sprint(id),
 		MaxViews:             100 + id,
-		LastUpdated:          time.Now().Add(-1 * time.Minute),
+		LastUpdatedUnix:      time.Now().Add(-1 * time.Minute).Unix(),
 	}
 }
 
@@ -32,10 +32,10 @@ func createLiveVodWithViews(id int, views int) scraper.LiveVod {
 	return scraper.LiveVod{
 		StreamerId:           fmt.Sprint("streamerid", id),
 		StreamId:             fmt.Sprint("streamid", id),
-		StartTime:            time.Now().Add(-60 * time.Minute),
+		StartTimeUnix:        time.Now().Add(-60 * time.Minute).Unix(),
 		StreamerLoginAtStart: fmt.Sprint(id),
 		MaxViews:             views,
-		LastUpdated:          time.Now().Add(-1 * time.Minute),
+		LastUpdatedUnix:      time.Now().Add(-1 * time.Minute).Unix(),
 	}
 }
 
@@ -66,9 +66,9 @@ var streams3 = []scraper.LiveVod{
 func getUpsertManyStreamsParams(streams []scraper.LiveVod) sqlvods.UpsertManyStreamsParams {
 	result := sqlvods.UpsertManyStreamsParams{}
 	for _, stream := range streams {
-		result.LastUpdatedAtArr = append(result.LastUpdatedAtArr, stream.LastUpdated)
+		result.LastUpdatedAtArr = append(result.LastUpdatedAtArr, time.Unix(stream.LastUpdatedUnix, 0))
 		result.MaxViewsArr = append(result.MaxViewsArr, int64(stream.MaxViews))
-		result.StartTimeArr = append(result.StartTimeArr, stream.StartTime)
+		result.StartTimeArr = append(result.StartTimeArr, time.Unix(stream.StartTimeUnix, 0))
 		result.StreamIDArr = append(result.StreamIDArr, stream.StreamId)
 		result.StreamerIDArr = append(result.StreamerIDArr, stream.StreamerId)
 		result.StreamerLoginAtStartArr = append(result.StreamerLoginAtStartArr, stream.StreamerLoginAtStart)
