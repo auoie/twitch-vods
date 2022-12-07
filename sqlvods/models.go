@@ -28,9 +28,9 @@ type Stream struct {
 	RecordingFetchedAt               sql.NullTime
 	GzippedBytes                     []byte
 	HlsDomain                        sql.NullString
+	HlsDurationSeconds               sql.NullFloat64
 	BytesFound                       sql.NullBool
 	Public                           sql.NullBool
 	SubOnly                          sql.NullBool
 	SeekPreviewsDomain               sql.NullString
-	HlsDurationSeconds               sql.NullFloat64
 }

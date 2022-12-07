@@ -8,6 +8,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
+	"time"
 
 	"github.com/auoie/twitchVods/sqlvods"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -74,7 +76,7 @@ func main() {
 		}
 		streamResults := []TStreamResult{}
 		for _, stream := range streams {
-			streamResults = append(streamResults, TStreamResult{Metadata: stream, Link: fmt.Sprint("/m3u8/", stream.StreamID, "/index.m3u8")})
+			streamResults = append(streamResults, TStreamResult{Metadata: stream, Link: fmt.Sprint("/m3u8/", stream.StreamID, "/", stream.StartTime.Unix(), "/index.m3u8")})
 		}
 		bytes, err := json.Marshal(streamResults)
 		if err != nil {
@@ -84,13 +86,26 @@ func main() {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(bytes)
 	})
-	router.GET("/m3u8/:streamid/index.m3u8", func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	router.GET("/m3u8/:streamid/:unix/index.m3u8", func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		streamid := p.ByName("streamid")
 		if streamid == "" {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		streams, err := queries.GetStreamGzippedBytes(ctx, streamid)
+		unix := p.ByName("unix")
+		if unix == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		unix_int, err := strconv.ParseInt(unix, 10, 64)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		streams, err := queries.GetStreamGzippedBytes(ctx, sqlvods.GetStreamGzippedBytesParams{
+			StreamID:  streamid,
+			StartTime: time.Unix(unix_int, 0).UTC(),
+		})
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			return

@@ -64,6 +64,11 @@ func threeUsersInformation(graphqlClient graphql.Client, user1, user2, user3 str
 	if err != nil {
 		return err
 	}
+	startTime := response.User2.Videos.Edges[0].Node.CreatedAt
+	fmt.Println(startTime)
+	fmt.Println(startTime.Location())
+	fmt.Println(startTime == startTime.UTC())
+	fmt.Println(time.Now().UTC().Location())
 	print(response)
 	user1data, _ := twitchgql.GetUserData(context.Background(), graphqlClient, response.User1.Id)
 	print(user1data)

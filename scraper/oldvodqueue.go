@@ -2,6 +2,7 @@ package scraper
 
 import (
 	"errors"
+	"time"
 
 	"github.com/monitor1379/yagods/maps/treemap"
 	"github.com/monitor1379/yagods/utils"
@@ -12,12 +13,13 @@ type oldVodsPriorityQueue struct {
 }
 
 type oldVodKey struct {
-	maxViews int
-	streamId string
+	maxViews  int
+	streamId  string
+	startTime time.Time
 }
 
 func (vod *LiveVod) getOldVodKey() *oldVodKey {
-	return &oldVodKey{maxViews: vod.MaxViews, streamId: vod.StreamId}
+	return &oldVodKey{maxViews: vod.MaxViews, streamId: vod.StreamId, startTime: vod.StartTime}
 }
 
 func CreateNewOldVodQueue() *oldVodsPriorityQueue {
@@ -27,7 +29,11 @@ func CreateNewOldVodQueue() *oldVodsPriorityQueue {
 			if dif != 0 {
 				return dif
 			}
-			return utils.StringComparator(a.streamId, b.streamId)
+			dif = utils.StringComparator(a.streamId, b.streamId)
+			if dif != 0 {
+				return dif
+			}
+			return utils.TimeComparator(a.startTime, b.startTime)
 		})}
 }
 

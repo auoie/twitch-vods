@@ -35,7 +35,7 @@ func (q *Queries) DeleteStreams(ctx context.Context) error {
 
 const getEverything = `-- name: GetEverything :many
 SELECT
-  id, streamer_id, stream_id, start_time, max_views, last_updated_at, streamer_login_at_start, language_at_start, title_at_start, game_name_at_start, game_id_at_start, is_mature_at_start, last_updated_minus_start_time_seconds, recording_fetched_at, gzipped_bytes, hls_domain, bytes_found, public, sub_only, seek_previews_domain, hls_duration_seconds
+  id, streamer_id, stream_id, start_time, max_views, last_updated_at, streamer_login_at_start, language_at_start, title_at_start, game_name_at_start, game_id_at_start, is_mature_at_start, last_updated_minus_start_time_seconds, recording_fetched_at, gzipped_bytes, hls_domain, hls_duration_seconds, bytes_found, public, sub_only, seek_previews_domain
 FROM
   streams s
 `
@@ -66,11 +66,11 @@ func (q *Queries) GetEverything(ctx context.Context) ([]Stream, error) {
 			&i.RecordingFetchedAt,
 			&i.GzippedBytes,
 			&i.HlsDomain,
+			&i.HlsDurationSeconds,
 			&i.BytesFound,
 			&i.Public,
 			&i.SubOnly,
 			&i.SeekPreviewsDomain,
-			&i.HlsDurationSeconds,
 		); err != nil {
 			return nil, err
 		}
@@ -234,61 +234,6 @@ func (q *Queries) GetLatestStreams(ctx context.Context, limit int32) ([]GetLates
 	return items, nil
 }
 
-const getLatestStreamsFromStreamerId = `-- name: GetLatestStreamsFromStreamerId :many
-SELECT
-  id, last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start
-FROM
-  streams
-WHERE
-  streamer_id = $1
-ORDER BY
-  start_time DESC
-LIMIT $2
-`
-
-type GetLatestStreamsFromStreamerIdParams struct {
-	StreamerID string
-	Limit      int32
-}
-
-type GetLatestStreamsFromStreamerIdRow struct {
-	ID                   uuid.UUID
-	LastUpdatedAt        time.Time
-	MaxViews             int64
-	StartTime            time.Time
-	StreamerID           string
-	StreamID             string
-	StreamerLoginAtStart string
-}
-
-func (q *Queries) GetLatestStreamsFromStreamerId(ctx context.Context, arg GetLatestStreamsFromStreamerIdParams) ([]GetLatestStreamsFromStreamerIdRow, error) {
-	rows, err := q.db.Query(ctx, getLatestStreamsFromStreamerId, arg.StreamerID, arg.Limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []GetLatestStreamsFromStreamerIdRow
-	for rows.Next() {
-		var i GetLatestStreamsFromStreamerIdRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.LastUpdatedAt,
-			&i.MaxViews,
-			&i.StartTime,
-			&i.StreamerID,
-			&i.StreamID,
-			&i.StreamerLoginAtStart,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getLatestStreamsFromStreamerLogin = `-- name: GetLatestStreamsFromStreamerLogin :many
 WITH
   goal_id AS
@@ -302,7 +247,7 @@ ORDER BY
   start_time DESC
 LIMIT 1)
 SELECT
-  id, s.streamer_id, stream_id, start_time, max_views, last_updated_at, streamer_login_at_start, language_at_start, title_at_start, game_name_at_start, game_id_at_start, is_mature_at_start, last_updated_minus_start_time_seconds, recording_fetched_at, gzipped_bytes, hls_domain, bytes_found, public, sub_only, seek_previews_domain, hls_duration_seconds, goal_id.streamer_id
+  id, s.streamer_id, stream_id, start_time, max_views, last_updated_at, streamer_login_at_start, language_at_start, title_at_start, game_name_at_start, game_id_at_start, is_mature_at_start, last_updated_minus_start_time_seconds, recording_fetched_at, gzipped_bytes, hls_domain, hls_duration_seconds, bytes_found, public, sub_only, seek_previews_domain, goal_id.streamer_id
 FROM
   streams s
 INNER JOIN
@@ -336,11 +281,11 @@ type GetLatestStreamsFromStreamerLoginRow struct {
 	RecordingFetchedAt               sql.NullTime
 	GzippedBytes                     []byte
 	HlsDomain                        sql.NullString
+	HlsDurationSeconds               sql.NullFloat64
 	BytesFound                       sql.NullBool
 	Public                           sql.NullBool
 	SubOnly                          sql.NullBool
 	SeekPreviewsDomain               sql.NullString
-	HlsDurationSeconds               sql.NullFloat64
 	StreamerID_2                     string
 }
 
@@ -370,63 +315,12 @@ func (q *Queries) GetLatestStreamsFromStreamerLogin(ctx context.Context, arg Get
 			&i.RecordingFetchedAt,
 			&i.GzippedBytes,
 			&i.HlsDomain,
+			&i.HlsDurationSeconds,
 			&i.BytesFound,
 			&i.Public,
 			&i.SubOnly,
 			&i.SeekPreviewsDomain,
-			&i.HlsDurationSeconds,
 			&i.StreamerID_2,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getStreamForEachStreamIdUnnest = `-- name: GetStreamForEachStreamIdUnnest :many
-WITH
-  ids AS (SELECT unnest($1::TEXT[]) AS stream_id)
-SELECT
-  id, last_updated_at, max_views, start_time, streamer_id, streams.stream_id, streamer_login_at_start
-FROM 
-  ids
-LEFT JOIN
-  streams
-ON
-  ids.stream_id = streams.stream_id
-`
-
-type GetStreamForEachStreamIdUnnestRow struct {
-	ID                   uuid.NullUUID
-	LastUpdatedAt        sql.NullTime
-	MaxViews             sql.NullInt64
-	StartTime            sql.NullTime
-	StreamerID           sql.NullString
-	StreamID             sql.NullString
-	StreamerLoginAtStart sql.NullString
-}
-
-func (q *Queries) GetStreamForEachStreamIdUnnest(ctx context.Context, streamIDArr []string) ([]GetStreamForEachStreamIdUnnestRow, error) {
-	rows, err := q.db.Query(ctx, getStreamForEachStreamIdUnnest, streamIDArr)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []GetStreamForEachStreamIdUnnestRow
-	for rows.Next() {
-		var i GetStreamForEachStreamIdUnnestRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.LastUpdatedAt,
-			&i.MaxViews,
-			&i.StartTime,
-			&i.StreamerID,
-			&i.StreamID,
-			&i.StreamerLoginAtStart,
 		); err != nil {
 			return nil, err
 		}
@@ -444,12 +338,18 @@ SELECT
 FROM
   streams
 WHERE
-  stream_id = $1
+  stream_id = $1 AND
+  start_time = $2
 LIMIT 1
 `
 
-func (q *Queries) GetStreamGzippedBytes(ctx context.Context, streamID string) ([][]byte, error) {
-	rows, err := q.db.Query(ctx, getStreamGzippedBytes, streamID)
+type GetStreamGzippedBytesParams struct {
+	StreamID  string
+	StartTime time.Time
+}
+
+func (q *Queries) GetStreamGzippedBytes(ctx context.Context, arg GetStreamGzippedBytesParams) ([][]byte, error) {
+	rows, err := q.db.Query(ctx, getStreamGzippedBytes, arg.StreamID, arg.StartTime)
 	if err != nil {
 		return nil, err
 	}
@@ -472,20 +372,22 @@ const updateRecording = `-- name: UpdateRecording :exec
 UPDATE
   streams
 SET
-  recording_fetched_at = $2,
-  hls_domain = $3,
-  gzipped_bytes = $4,
-  bytes_found = $5,
-  seek_previews_domain = $6,
-  public = $7,
-  sub_only = $8,
-  hls_duration_seconds = $9
+  recording_fetched_at = $3,
+  hls_domain = $4,
+  gzipped_bytes = $5,
+  bytes_found = $6,
+  seek_previews_domain = $7,
+  public = $8,
+  sub_only = $9,
+  hls_duration_seconds = $10
 WHERE
-  stream_id = $1
+  stream_id = $1 AND
+  start_time = $2
 `
 
 type UpdateRecordingParams struct {
 	StreamID           string
+	StartTime          time.Time
 	RecordingFetchedAt sql.NullTime
 	HlsDomain          sql.NullString
 	GzippedBytes       []byte
@@ -499,6 +401,7 @@ type UpdateRecordingParams struct {
 func (q *Queries) UpdateRecording(ctx context.Context, arg UpdateRecordingParams) error {
 	_, err := q.db.Exec(ctx, updateRecording,
 		arg.StreamID,
+		arg.StartTime,
 		arg.RecordingFetchedAt,
 		arg.HlsDomain,
 		arg.GzippedBytes,
@@ -528,7 +431,7 @@ SELECT
   unnest($11::TEXT[]) AS game_id_at_start,
   unnest($12::DOUBLE PRECISION[]) AS last_updated_minus_start_time_seconds
 ON CONFLICT
-  (stream_id)
+  (stream_id, start_time)
 DO
   UPDATE SET
     last_updated_at = EXCLUDED.last_updated_at,

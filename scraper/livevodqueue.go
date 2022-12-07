@@ -2,6 +2,7 @@ package scraper
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/monitor1379/yagods/maps/treemap"
@@ -26,9 +27,7 @@ type liveVodKey struct {
 
 type liveVodsPriorityQueue struct {
 	// streamerId acts as a primary key
-	// streamId also acts as a primary key
 	streamerIdToVod  map[string]*LiveVod // at most one VOD per streamer id
-	streamIdToVod    map[string]*LiveVod // at most one VOD per stream id
 	lastUpdatedToVod *treemap.Map[*liveVodKey, *LiveVod]
 }
 
@@ -36,7 +35,6 @@ type liveVodsPriorityQueue struct {
 func CreateNewLiveVodsPriorityQueue() *liveVodsPriorityQueue {
 	return &liveVodsPriorityQueue{
 		streamerIdToVod: map[string]*LiveVod{},
-		streamIdToVod:   map[string]*LiveVod{},
 		lastUpdatedToVod: treemap.NewWith[*liveVodKey, *LiveVod](func(a, b *liveVodKey) int {
 			dif := utils.TimeComparator(a.lastUpdated, b.lastUpdated)
 			if dif != 0 {
@@ -61,14 +59,13 @@ func (vods *liveVodsPriorityQueue) GetStalestStream() (*LiveVod, error) {
 
 func (vods *liveVodsPriorityQueue) RemoveVod(vod *LiveVod) {
 	vods.lastUpdatedToVod.Remove(vod.getLiveVodsKey())
-	delete(vods.streamIdToVod, vod.StreamId)
 	delete(vods.streamerIdToVod, vod.StreamerId)
 }
 
 // Parameters are the information for the VOD.
 // Returns nil error iff new VOD evicts an older VOD.
 // In the above case, the returned VOD will be the evicted VOD.
-func (vods *liveVodsPriorityQueue) UpsertVod(curTime time.Time, data VodDataPoint) (*LiveVod, error) {
+func (vods *liveVodsPriorityQueue) UpsertVod(data VodDataPoint) (*LiveVod, error) {
 	node := data.Node
 	liveVod := &LiveVod{
 		StreamerId:           node.Broadcaster.Id,
@@ -76,8 +73,8 @@ func (vods *liveVodsPriorityQueue) UpsertVod(curTime time.Time, data VodDataPoin
 		StartTime:            node.CreatedAt,
 		StreamerLoginAtStart: node.Broadcaster.Login,
 		MaxViews:             node.ViewersCount,
-		LastUpdated:          curTime,
-		LastInteraction:      curTime,
+		LastUpdated:          data.ResponseReturnedTime,
+		LastInteraction:      data.ResponseReturnedTime,
 	}
 	return vods.UpsertLiveVod(liveVod)
 }
@@ -87,21 +84,19 @@ func (vods *liveVodsPriorityQueue) UpsertVod(curTime time.Time, data VodDataPoin
 // In the above case, the returned VOD will be the evicted VOD.
 func (vods *liveVodsPriorityQueue) UpsertLiveVod(liveVod *LiveVod) (*LiveVod, error) {
 	streamerId := liveVod.StreamerId
-	streamId := liveVod.StreamId
 	startTime := liveVod.StartTime
 	viewers := liveVod.MaxViews
 	curVod, ok := vods.streamerIdToVod[streamerId] // check if the streamer has an old stream
 	if !ok {
 		// This is a new stream and streamer doesn't have a stream in the queue
 		vods.lastUpdatedToVod.Put(liveVod.getLiveVodsKey(), liveVod)
-		vods.streamIdToVod[streamId] = liveVod
 		vods.streamerIdToVod[streamerId] = liveVod
 		return nil, errors.New("VOD is new")
 	} else if curVod.StartTime != startTime {
 		// This is a new stream and streamer has a stream in the queue
+		fmt.Println(fmt.Sprint("curVod.StartTime and startTime: ", curVod.StartTime, startTime))
 		vods.RemoveVod(curVod)
 		vods.lastUpdatedToVod.Put(liveVod.getLiveVodsKey(), liveVod)
-		vods.streamIdToVod[streamId] = liveVod
 		vods.streamerIdToVod[streamerId] = liveVod
 		return curVod, nil
 	} else {
@@ -111,7 +106,6 @@ func (vods *liveVodsPriorityQueue) UpsertLiveVod(liveVod *LiveVod) (*LiveVod, er
 		curVod.LastUpdated = liveVod.LastUpdated
 		curVod.LastInteraction = liveVod.LastInteraction
 		vods.lastUpdatedToVod.Put(curVod.getLiveVodsKey(), curVod)
-		vods.streamIdToVod[streamId] = curVod
 		vods.streamerIdToVod[streamerId] = curVod
 		return nil, errors.New("VOD exists and has been updated")
 	}

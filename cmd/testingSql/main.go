@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log"
 	"os"
@@ -99,108 +98,108 @@ func main() {
 	logFatalOnError(conn.Ping(context.Background()))
 	queries := sqlvods.New(conn)
 
-	logFatalOnError(queries.UpsertManyStreams(context.Background(), getUpsertManyStreamsParams(streams0)))
-	everything, err := queries.GetEverything(context.Background())
-	logFatalOnError(err)
-	log.Println(everything)
-	log.Println(len(everything))
-	log.Print()
+	// logFatalOnError(queries.UpsertManyStreams(context.Background(), getUpsertManyStreamsParams(streams0)))
+	// everything, err := queries.GetEverything(context.Background())
+	// logFatalOnError(err)
+	// log.Println(everything)
+	// log.Println(len(everything))
+	// log.Print()
 
-	logFatalOnError(queries.UpsertManyStreams(context.Background(), getUpsertManyStreamsParams(streams1)))
-	everything, err = queries.GetEverything(context.Background())
-	logFatalOnError(err)
-	log.Println(everything)
-	log.Println(len(everything))
-	log.Print()
+	// logFatalOnError(queries.UpsertManyStreams(context.Background(), getUpsertManyStreamsParams(streams1)))
+	// everything, err = queries.GetEverything(context.Background())
+	// logFatalOnError(err)
+	// log.Println(everything)
+	// log.Println(len(everything))
+	// log.Print()
 
-	logFatalOnError(queries.UpsertManyStreams(context.Background(), getUpsertManyStreamsParams(streams2)))
-	everything, err = queries.GetEverything(context.Background())
-	logFatalOnError(err)
-	log.Println(everything)
-	log.Println(len(everything))
-	log.Print()
+	// logFatalOnError(queries.UpsertManyStreams(context.Background(), getUpsertManyStreamsParams(streams2)))
+	// everything, err = queries.GetEverything(context.Background())
+	// logFatalOnError(err)
+	// log.Println(everything)
+	// log.Println(len(everything))
+	// log.Print()
 
-	logFatalOnError(queries.UpsertManyStreams(context.Background(), getUpsertManyStreamsParams(streams3)))
-	everything, err = queries.GetEverything(context.Background())
-	logFatalOnError(err)
-	log.Println("upserted many streams")
-	log.Println(everything)
-	log.Println(len(everything))
-	log.Print()
+	// logFatalOnError(queries.UpsertManyStreams(context.Background(), getUpsertManyStreamsParams(streams3)))
+	// everything, err = queries.GetEverything(context.Background())
+	// logFatalOnError(err)
+	// log.Println("upserted many streams")
+	// log.Println(everything)
+	// log.Println(len(everything))
+	// log.Print()
 
-	batchedStreams := queries.GetStreamForEachStreamIdBatched(context.Background(), []string{"hmm", "streamid0", "doesn't exist"})
-	streams := []sqlvods.GetStreamForEachStreamIdBatchedRow{}
-	batchedStreams.Query(func(i int, gsfesibr []sqlvods.GetStreamForEachStreamIdBatchedRow, err error) {
-		if err != nil {
-			return
-		}
-		if len(gsfesibr) != 1 {
-			return
-		}
-		streams = append(streams, gsfesibr[0])
-	})
-	logFatalOnError(err)
-	log.Println(streams)
-	log.Println(len(streams))
-	log.Print()
+	// batchedStreams := queries.GetStreamForEachStreamIdBatched(context.Background(), []string{"hmm", "streamid0", "doesn't exist"})
+	// streams := []sqlvods.GetStreamForEachStreamIdBatchedRow{}
+	// batchedStreams.Query(func(i int, gsfesibr []sqlvods.GetStreamForEachStreamIdBatchedRow, err error) {
+	// 	if err != nil {
+	// 		return
+	// 	}
+	// 	if len(gsfesibr) != 1 {
+	// 		return
+	// 	}
+	// 	streams = append(streams, gsfesibr[0])
+	// })
+	// logFatalOnError(err)
+	// log.Println(streams)
+	// log.Println(len(streams))
+	// log.Print()
 
-	err = queries.UpdateRecording(context.Background(), sqlvods.UpdateRecordingParams{
-		GzippedBytes:       []byte{'a', 'b', 'c'},
-		StreamID:           "lskdjfslkjf",
-		BytesFound:         sql.NullBool{Bool: true, Valid: true},
-		RecordingFetchedAt: sql.NullTime{Time: time.Now(), Valid: true}})
-	log.Println("upserted recording with invalid stream id")
-	log.Println(err)
-	log.Print()
+	// err = queries.UpdateRecording(context.Background(), sqlvods.UpdateRecordingParams{
+	// 	GzippedBytes:       []byte{'a', 'b', 'c'},
+	// 	StreamID:           "lskdjfslkjf",
+	// 	BytesFound:         sql.NullBool{Bool: true, Valid: true},
+	// 	RecordingFetchedAt: sql.NullTime{Time: time.Now(), Valid: true}})
+	// log.Println("upserted recording with invalid stream id")
+	// log.Println(err)
+	// log.Print()
 
-	log.Println(streams[0].StreamID)
-	logFatalOnError(queries.UpdateRecording(context.Background(), sqlvods.UpdateRecordingParams{
-		RecordingFetchedAt: sql.NullTime{Time: time.Now(), Valid: true},
-		GzippedBytes:       []byte{'a', 'b', 'c'},
-		StreamID:           streams[0].StreamID,
-		BytesFound:         sql.NullBool{Bool: true, Valid: true}}))
-	everything, err = queries.GetEverything(context.Background())
-	logFatalOnError(err)
-	log.Println(everything)
-	log.Println(len(everything))
-	log.Print()
+	// log.Println(streams[0].StreamID)
+	// logFatalOnError(queries.UpdateRecording(context.Background(), sqlvods.UpdateRecordingParams{
+	// 	RecordingFetchedAt: sql.NullTime{Time: time.Now(), Valid: true},
+	// 	GzippedBytes:       []byte{'a', 'b', 'c'},
+	// 	StreamID:           streams[0].StreamID,
+	// 	BytesFound:         sql.NullBool{Bool: true, Valid: true}}))
+	// everything, err = queries.GetEverything(context.Background())
+	// logFatalOnError(err)
+	// log.Println(everything)
+	// log.Println(len(everything))
+	// log.Print()
 
-	logFatalOnError(queries.UpdateRecording(context.Background(), sqlvods.UpdateRecordingParams{
-		RecordingFetchedAt: sql.NullTime{Time: time.Now(), Valid: true},
-		GzippedBytes:       nil,
-		StreamID:           streams[0].StreamID,
-		BytesFound:         sql.NullBool{Bool: false, Valid: true},
-		Public:             sql.NullBool{Bool: true, Valid: false},
-		SubOnly:            sql.NullBool{Bool: false, Valid: false},
-	}))
-	everything, err = queries.GetEverything(context.Background())
-	logFatalOnError(err)
-	log.Println(streams[0].StreamID)
-	log.Println("hello")
-	log.Println(everything)
-	log.Println(len(everything))
-	log.Print()
+	// logFatalOnError(queries.UpdateRecording(context.Background(), sqlvods.UpdateRecordingParams{
+	// 	RecordingFetchedAt: sql.NullTime{Time: time.Now(), Valid: true},
+	// 	GzippedBytes:       nil,
+	// 	StreamID:           streams[0].StreamID,
+	// 	BytesFound:         sql.NullBool{Bool: false, Valid: true},
+	// 	Public:             sql.NullBool{Bool: true, Valid: false},
+	// 	SubOnly:            sql.NullBool{Bool: false, Valid: false},
+	// }))
+	// everything, err = queries.GetEverything(context.Background())
+	// logFatalOnError(err)
+	// log.Println(streams[0].StreamID)
+	// log.Println("hello")
+	// log.Println(everything)
+	// log.Println(len(everything))
+	// log.Print()
 
-	results := queries.GetStreamForEachStreamIdBatched(context.Background(), []string{"hmm", "streamid0", "doesn't exist"})
-	results.Query(func(i int, gsfesibr []sqlvods.GetStreamForEachStreamIdBatchedRow, err error) {
-		if err != nil {
-			log.Println(err)
-		} else {
-			log.Println(gsfesibr)
-			log.Println(gsfesibr == nil)
-		}
-	})
-	log.Print()
+	// results := queries.GetStreamForEachStreamIdBatched(context.Background(), []string{"hmm", "streamid0", "doesn't exist"})
+	// results.Query(func(i int, gsfesibr []sqlvods.GetStreamForEachStreamIdBatchedRow, err error) {
+	// 	if err != nil {
+	// 		log.Println(err)
+	// 	} else {
+	// 		log.Println(gsfesibr)
+	// 		log.Println(gsfesibr == nil)
+	// 	}
+	// })
+	// log.Print()
 
-	streamsunnest, err := queries.GetStreamForEachStreamIdUnnest(context.Background(), []string{"hmm", "streamid0", "doesn't exist", "streamid0", "streamid1"})
-	logFatalOnError(err)
-	log.Println(streamsunnest)
-	log.Println(len(streamsunnest))
-	for _, elem := range streamsunnest {
-		log.Println(isNonZero(elem))
-		log.Println(elem.ID.Valid)
-	}
-	log.Print()
+	// streamsunnest, err := queries.GetStreamForEachStreamIdUnnest(context.Background(), []string{"hmm", "streamid0", "doesn't exist", "streamid0", "streamid1"})
+	// logFatalOnError(err)
+	// log.Println(streamsunnest)
+	// log.Println(len(streamsunnest))
+	// for _, elem := range streamsunnest {
+	// 	log.Println(isNonZero(elem))
+	// 	log.Println(elem.ID.Valid)
+	// }
+	// log.Print()
 
 	logFatalOnError(queries.DeleteStreams(context.Background()))
 }

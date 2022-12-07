@@ -193,15 +193,15 @@ func fetchTwitchGqlForever(params fetchTwitchGqlForeverParams) {
 			if node.ViewersCount < params.minViewerCountToObserve {
 				continue
 			}
-			waitVod, err := waitVodQueue.GetByStreamId(node.Id)
+			highViewNodes = append(highViewNodes, node)
+			allVodsLessThanMinViewerCount = false
+			waitVod, err := waitVodQueue.GetByStreamIdStartTime(node.Id, node.CreatedAt)
 			if err == nil {
+				log.Println(fmt.Sprint("Removing vod from wait queue: ", *waitVod))
 				waitVodQueue.RemoveVod(waitVod)
 				liveVodQueue.UpsertLiveVod(waitVod)
 			}
-			highViewNodes = append(highViewNodes, node)
-			allVodsLessThanMinViewerCount = false
 			evictedVod, err := liveVodQueue.UpsertVod(
-				responseReturnedTime,
 				VodDataPoint{Node: node, ResponseReturnedTime: responseReturnedTime},
 			)
 			if err != nil {
@@ -529,6 +529,7 @@ func processVodResults(ctx context.Context, resultsCh chan *VodResult, done chan
 			Public:             result.Public,
 			SubOnly:            result.SubOnly,
 			HlsDurationSeconds: result.HlsDurationSeconds,
+			StartTime:          result.Vod.StartTime,
 		}
 		err := queries.UpdateRecording(ctx, upsertRecordingParams)
 		if err != nil {

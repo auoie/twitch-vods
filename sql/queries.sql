@@ -4,16 +4,8 @@ SELECT
 FROM
   streams
 WHERE
-  stream_id = $1
-LIMIT 1;
-
--- name: GetStreamForEachStreamIdBatched :batchmany
-SELECT
-  id, last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start
-FROM 
-  streams
-WHERE
-  stream_id = $1
+  stream_id = $1 AND
+  start_time = $2
 LIMIT 1;
 
 -- name: GetLatestStreamsFromStreamerLogin :many
@@ -40,19 +32,6 @@ ORDER BY
   start_time DESC
 LIMIT $2;
 
-
--- name: GetStreamForEachStreamIdUnnest :many
-WITH
-  ids AS (SELECT unnest(@stream_id_arr::TEXT[]) AS stream_id)
-SELECT
-  id, last_updated_at, max_views, start_time, streamer_id, streams.stream_id, streamer_login_at_start
-FROM 
-  ids
-LEFT JOIN
-  streams
-ON
-  ids.stream_id = streams.stream_id; 
-
 -- name: UpsertManyStreams :exec
 INSERT INTO
   streams (last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start, is_mature_at_start, game_id_at_start, last_updated_minus_start_time_seconds)
@@ -70,23 +49,12 @@ SELECT
   unnest(@game_id_at_start_arr::TEXT[]) AS game_id_at_start,
   unnest(@last_updated_minus_start_time_seconds_arr::DOUBLE PRECISION[]) AS last_updated_minus_start_time_seconds
 ON CONFLICT
-  (stream_id)
+  (stream_id, start_time)
 DO
   UPDATE SET
     last_updated_at = EXCLUDED.last_updated_at,
     last_updated_minus_start_time_seconds = EXCLUDED.last_updated_minus_start_time_seconds,
     max_views = GREATEST(streams.max_views, EXCLUDED.max_views);
-
--- name: GetLatestStreamsFromStreamerId :many
-SELECT
-  id, last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start
-FROM
-  streams
-WHERE
-  streamer_id = $1
-ORDER BY
-  start_time DESC
-LIMIT $2;
 
 -- name: GetLatestStreams :many
 SELECT
@@ -110,16 +78,17 @@ WHERE
 UPDATE
   streams
 SET
-  recording_fetched_at = $2,
-  hls_domain = $3,
-  gzipped_bytes = $4,
-  bytes_found = $5,
-  seek_previews_domain = $6,
-  public = $7,
-  sub_only = $8,
-  hls_duration_seconds = $9
+  recording_fetched_at = $3,
+  hls_domain = $4,
+  gzipped_bytes = $5,
+  bytes_found = $6,
+  seek_previews_domain = $7,
+  public = $8,
+  sub_only = $9,
+  hls_duration_seconds = $10
 WHERE
-  stream_id = $1;
+  stream_id = $1 AND
+  start_time = $2;
 
 -- name: GetHighestViewedLiveStreams :many
 SELECT
