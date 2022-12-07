@@ -685,9 +685,10 @@ func RunScraper(ctx context.Context, databaseUrl string, evictionRatio float64, 
 			return &tInitialState{conn: conn, queries: queries, liveVodQueue: liveVodQueue}, nil
 		}
 		latestStream := latestStreams[0]
-		lastTimeAllowed := latestStream.LastUpdatedAt.Add(-time.Duration(float64(params.LiveVodEvictionThreshold+params.WaitVodEvictionThreshold) * evictionRatio))
+		lastTimeAllowed := latestStream.LastUpdatedAt.UTC().Add(-time.Duration(float64(params.LiveVodEvictionThreshold+params.WaitVodEvictionThreshold) * evictionRatio))
 		latestLiveStreams, err := queries.GetLatestLiveStreams(ctx, lastTimeAllowed)
 		if err != nil {
+			fmt.Println("There are no latestLiveStreams")
 			conn.Close()
 			return nil, err
 		}
@@ -696,10 +697,10 @@ func RunScraper(ctx context.Context, databaseUrl string, evictionRatio float64, 
 			liveVodQueue.UpsertLiveVod(&LiveVod{
 				StreamerId:           liveStream.StreamerID,
 				StreamId:             liveStream.StreamID,
-				StartTimeUnix:        liveStream.StartTime.Unix(),
+				StartTimeUnix:        liveStream.StartTime.UTC().Unix(),
 				StreamerLoginAtStart: liveStream.StreamerLoginAtStart,
 				MaxViews:             int(liveStream.MaxViews),
-				LastUpdatedUnix:      liveStream.LastUpdatedAt.Unix(),
+				LastUpdatedUnix:      liveStream.LastUpdatedAt.UTC().Unix(),
 				LastInteractionUnix:  lastInteraction.Unix(),
 			})
 		}
