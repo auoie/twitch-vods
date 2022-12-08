@@ -24,7 +24,7 @@ func main() {
 			LiveVodEvictionThreshold:   11 * time.Minute,
 			WaitVodEvictionThreshold:   31 * time.Minute,
 			MaxOldVodsQueueSize:        50000,
-			NumHlsFetchers:             4,
+			NumHlsFetchers:             3,
 			HlsFetcherDelay:            time.Second,
 			CursorResetThreshold:       5 * time.Minute,
 			LibdeflateCompressionLevel: 1,

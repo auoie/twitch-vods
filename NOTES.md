@@ -338,7 +338,13 @@ Multiple Twitch VODs can have the same stream id.
 This can happen, for example, if the streamer restarts the stream.
 In this case, the time is `time.Second()` rather than `time.Unix()`.
 In particular, see [this video](https://www.twitch.tv/videos/1671724933) from Twitch streamer `leagreasy`.
-So for a primary key for a stream, I should use the composit key `(start_time, stream_id)` rather than just `stream_id`.
+So for a primary key for a stream, I should use the composite key `(start_time, stream_id)` rather than just `stream_id`.
+
+Cloudfront seems to default to a [rate limit](https://catalog.us-east-1.prod.workshops.aws/workshops/4d0b27bc-9f48-4356-8242-d13ca057fff2/en-US/application-layer-defense/rate-based-rules) of 2,000 requests per second. That is `6 2/3` requests per second.
+I'm going to lower the number of HLS requests to 3 requests per second.
+That comes out to 259200 streams per day.
+Right now, the pace is 168000 streams per day that reach at least 10 views.
+So this should be fine.
 
 ## Compression
 
@@ -372,8 +378,8 @@ Most of the VODs that are determined to be public should have `bytes_found = Tru
 Right now, it's a ratio of `0:29046`.
 
 ```SQL
-SELECT COUNT(*) FROM streams WHERE public = True AND bytes_found IS NULL AND last_updated_at BETWEEN NOW() - INTERVAL '10 hours' AND NOW() - INTERVAL '1 hour';
-SELECT COUNT(*) FROM streams WHERE public = True AND last_updated_at BETWEEN NOW() - INTERVAL '10 hours' AND NOW() - INTERVAL '1 hour';
+SELECT COUNT(*) FROM streams WHERE public = True AND bytes_found = False AND last_updated_at BETWEEN NOW() - INTERVAL '6 hours' AND NOW() - INTERVAL '43 minutes';
+SELECT COUNT(*) FROM streams WHERE public = True AND last_updated_at BETWEEN NOW() - INTERVAL '6 hours' AND NOW() - INTERVAL '43 minutes';
 ```
 
 ## TODO
