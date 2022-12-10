@@ -382,6 +382,45 @@ SELECT COUNT(*) FROM streams WHERE public = True AND bytes_found = False AND las
 SELECT COUNT(*) FROM streams WHERE public = True AND last_updated_at BETWEEN NOW() - INTERVAL '6 hours' AND NOW() - INTERVAL '43 minutes';
 ```
 
+## Current Status
+
+- There are periods of 15 to 20 minutes where all the cloudfront URLs except for `https://vod-metro.twitch.tv/` work. In the past 12 hours, 1526 out of 49388 steams were public but with the bytes not found.
+  So basically 3.1% of the streams have bytes not found as a result of these random periods.
+- The current domains that work are
+
+  ```text
+  https://d1m7jfoe9zdc1j.cloudfront.net/
+  https://d1mhjrowxxagfy.cloudfront.net/
+  https://d1ymi26ma8va5x.cloudfront.net/
+  https://d2nvs31859zcd8.cloudfront.net/
+  https://d2vjef5jvl6bfs.cloudfront.net/
+  https://d3vd9lfkzbru3h.cloudfront.net/
+  https://dgeft87wbj63p.cloudfront.net/
+  https://dqrpb9wgowsf5.cloudfront.net/
+  https://ds0h3roq6wcgc.cloudfront.net/
+  https://vod-metro.twitch.tv/
+  https://vod-pop-secure.twitch.tv/
+  https://vod-secure.twitch.tv/
+  ```
+
+- There are some stream id's that appear twice. None appear 3 times or more.
+  A lot of them seem to be view botting.
+  The one with the lowest views was at 49, but then it jumped up to 6885 after restarting.
+  In the cases where the VODs are not deleted, the second stream ID the unix timestamp in the hls domain is replaced with the second of the start time.
+  So I need to handle this case for streams that are restarted with the same stream ID.
+
+  I find these streams with
+
+  ```SQL
+  WITH high_count AS (SELECT stream_id FROM streams GROUP BY stream_id HAVING COUNT(*) >= 2 ORDER BY COUNT(*) DESC LIMIT 50) SELECT streams.stream_id, streamer_login_at_start, max_views, public, sub_only, bytes_found, start_time, streamer_id, LEFT(title_at_start, 30), recording_fetched_at, last_updated_at, game_name_at_start FROM streams INNER JOIN high_count ON streams.stream_id = high_count.stream_id ORDER BY (streams.stream_id, last_updated_at);
+  ```
+
+  A corollary is if the stream is restarted a second time and it starts at the same second, I'm guessing the previous stream could be overwritten.
+  Also, because these streams have the same stream id, the chat of the first stream is overwritten by the chat of the second stream.
+
+- There are several cases where the unix time in the hls format is 1 minus the unix time of the TwitchGQL start time.
+  This is strange. My current approach doesn't completely work 100% of the time because if the first request times out, it won't even try the second request.
+
 ## TODO
 
 - On scraper restart, change from the live vod queue to a wait vod queue.

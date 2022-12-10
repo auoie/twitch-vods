@@ -375,6 +375,9 @@ func getVodCompressedBytes(ctx context.Context, videoData *vods.VideoData, compr
 			VideoId:      videoData.VideoId,
 			Time:         videoData.Time.Add(-time.Second),
 		})
+		if err == nil {
+			log.Println("subtracted 1 second got result: ", *videoData)
+		}
 	}
 	if err != nil {
 		log.Println(fmt.Sprint("Link was not found for ", videoData.StreamerName, " because: ", err))
@@ -689,7 +692,7 @@ func RunScraper(ctx context.Context, databaseUrl string, evictionRatio float64, 
 		lastTimeAllowed := latestStream.LastUpdatedAt.UTC().Add(-time.Duration(float64(params.LiveVodEvictionThreshold+params.WaitVodEvictionThreshold) * evictionRatio))
 		latestLiveStreams, err := queries.GetLatestLiveStreams(ctx, lastTimeAllowed)
 		if err != nil {
-			fmt.Println("There are no latestLiveStreams")
+			log.Println("There are no latestLiveStreams")
 			conn.Close()
 			return nil, err
 		}

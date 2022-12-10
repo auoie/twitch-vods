@@ -3,6 +3,7 @@ package scraper
 import (
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/monitor1379/yagods/maps/treemap"
@@ -94,7 +95,7 @@ func (vods *liveVodsPriorityQueue) UpsertLiveVod(liveVod *LiveVod) (*LiveVod, er
 		return nil, errors.New("VOD is new")
 	} else if curVod.StartTimeUnix != startTimeUnix {
 		// This is a new stream and streamer has a stream in the queue
-		fmt.Println(fmt.Sprint("curVod.StartTime and startTime: ", time.Unix(curVod.StartTimeUnix, 0).UTC(), " and ", time.Unix(startTimeUnix, 0).UTC()))
+		log.Println(fmt.Sprint("curVod.StartTime and startTime: ", time.Unix(curVod.StartTimeUnix, 0).UTC(), " and ", time.Unix(startTimeUnix, 0).UTC()))
 		vods.RemoveVod(curVod)
 		vods.lastUpdatedToVod.Put(liveVod.getLiveVodsKey(), liveVod)
 		vods.streamerIdToVod[streamerId] = liveVod
