@@ -307,7 +307,7 @@ func processOldVodJobs(params processOldVodJobsParams) {
 		return params.oldVodJobsCh
 	}
 	getNextInQueue := func() *LiveVod {
-		oldVod, _ := oldVodsOrderedByViews.GetHighViewCount()
+		oldVod, _ := oldVodsOrderedByViews.GetLowViewCount()
 		return oldVod
 	}
 	debugCount := -1
@@ -327,7 +327,7 @@ func processOldVodJobs(params processOldVodJobsParams) {
 				}
 			}
 		case getJobsCh() <- getNextInQueue():
-			oldVodsOrderedByViews.PopHighViewCount()
+			oldVodsOrderedByViews.PopLowViewCount()
 		}
 	}
 }
@@ -624,7 +624,7 @@ func ScrapeTwitchLiveVodsWithGqlApi(ctx context.Context, params ScrapeTwitchLive
 type RunScraperParams struct {
 	// In any interval of this length, the api will be called at most twice and on average once.
 	TwitchGqlFetcherDelay time.Duration
-	// Time limit for .m3u8 and Twitch GQL requests. If this is exceeded in the TwithGQL loop, the for-loop continues. TODO: I should fix this.
+	// Time limit for .m3u8 and Twitch GQL requests. If this is exceeded in the TwitchGQL loop, the for-loop continues. TODO: I should fix this.
 	RequestTimeLimit time.Duration
 	// If a VOD in the queue of live VODs has a last updated time older than this, it is moved out of the live VODs queue.
 	LiveVodEvictionThreshold time.Duration
