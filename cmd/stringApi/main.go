@@ -50,7 +50,7 @@ func main() {
 			BytesFound:      sql.NullBool{Bool: true, Valid: true},
 			Public:          sql.NullBool{Bool: false, Valid: true},
 			LanguageAtStart: "EN",
-			Limit:           30,
+			Limit:           100,
 		})
 		if err != nil {
 			w.WriteHeader(500)
@@ -71,7 +71,7 @@ func main() {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		streams, err := queries.GetLatestStreamsFromStreamerLogin(ctx, sqlvods.GetLatestStreamsFromStreamerLoginParams{StreamerLoginAtStart: name, Limit: 30})
+		streams, err := queries.GetLatestStreamsFromStreamerLogin(ctx, sqlvods.GetLatestStreamsFromStreamerLoginParams{StreamerLoginAtStart: name, Limit: 100})
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			return

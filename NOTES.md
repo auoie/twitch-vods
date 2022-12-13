@@ -439,6 +439,15 @@ SELECT COUNT(*) FROM streams WHERE public = True AND last_updated_at BETWEEN NOW
 
 ## TODO
 
+- Try to avoid the cloudfront rate limit by making a custom govods in here to make fewer requests
+  - round robin, but if a url is successful, use that as the url of the next stream to start
+  - reduce the number of fetchers from 3 to 2
+- Fetch the HLS URLs in order of views descending. When I started being rate-limited, this leads to the problem of high view VODs recording as have no m3u8 file.
+  The solution is to have a channel that holds all of the failed VODs from the past minute.
+  If there are more the 3 failed public VODs in the past minute
+  - pause the old vods eviction for 5 minutes
+  - put those VODs back in the old vods queue
+  - include metadata on the maximum number of requests made on that url
 - On scraper restart, change from the live vod queue to a wait vod queue.
   Right now, if a streamer has a stream in the wait vod queue and a stream in the live vod queue, the wait vod queue entry will be skipped.
 - When I turn on my VPN and turn if off, the Twitch GQL requests work but the cloudfront requests don't work.
