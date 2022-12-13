@@ -247,7 +247,7 @@ ORDER BY
   start_time DESC
 LIMIT 1)
 SELECT
-  id, s.streamer_id, stream_id, start_time, max_views, last_updated_at, streamer_login_at_start, language_at_start, title_at_start, game_name_at_start, game_id_at_start, is_mature_at_start, last_updated_minus_start_time_seconds, recording_fetched_at, gzipped_bytes, hls_domain, hls_duration_seconds, bytes_found, public, sub_only, seek_previews_domain, goal_id.streamer_id
+  id, last_updated_at, max_views, start_time, s.streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start, is_mature_at_start, game_id_at_start, last_updated_minus_start_time_seconds, recording_fetched_at, hls_domain, bytes_found, seek_previews_domain, public, sub_only, hls_duration_seconds
 FROM
   streams s
 INNER JOIN
@@ -266,27 +266,25 @@ type GetLatestStreamsFromStreamerLoginParams struct {
 
 type GetLatestStreamsFromStreamerLoginRow struct {
 	ID                               uuid.UUID
+	LastUpdatedAt                    time.Time
+	MaxViews                         int64
+	StartTime                        time.Time
 	StreamerID                       string
 	StreamID                         string
-	StartTime                        time.Time
-	MaxViews                         int64
-	LastUpdatedAt                    time.Time
 	StreamerLoginAtStart             string
+	GameNameAtStart                  string
 	LanguageAtStart                  string
 	TitleAtStart                     string
-	GameNameAtStart                  string
-	GameIDAtStart                    string
 	IsMatureAtStart                  bool
+	GameIDAtStart                    string
 	LastUpdatedMinusStartTimeSeconds float64
 	RecordingFetchedAt               sql.NullTime
-	GzippedBytes                     []byte
 	HlsDomain                        sql.NullString
-	HlsDurationSeconds               sql.NullFloat64
 	BytesFound                       sql.NullBool
+	SeekPreviewsDomain               sql.NullString
 	Public                           sql.NullBool
 	SubOnly                          sql.NullBool
-	SeekPreviewsDomain               sql.NullString
-	StreamerID_2                     string
+	HlsDurationSeconds               sql.NullFloat64
 }
 
 func (q *Queries) GetLatestStreamsFromStreamerLogin(ctx context.Context, arg GetLatestStreamsFromStreamerLoginParams) ([]GetLatestStreamsFromStreamerLoginRow, error) {
@@ -300,27 +298,25 @@ func (q *Queries) GetLatestStreamsFromStreamerLogin(ctx context.Context, arg Get
 		var i GetLatestStreamsFromStreamerLoginRow
 		if err := rows.Scan(
 			&i.ID,
+			&i.LastUpdatedAt,
+			&i.MaxViews,
+			&i.StartTime,
 			&i.StreamerID,
 			&i.StreamID,
-			&i.StartTime,
-			&i.MaxViews,
-			&i.LastUpdatedAt,
 			&i.StreamerLoginAtStart,
+			&i.GameNameAtStart,
 			&i.LanguageAtStart,
 			&i.TitleAtStart,
-			&i.GameNameAtStart,
-			&i.GameIDAtStart,
 			&i.IsMatureAtStart,
+			&i.GameIDAtStart,
 			&i.LastUpdatedMinusStartTimeSeconds,
 			&i.RecordingFetchedAt,
-			&i.GzippedBytes,
 			&i.HlsDomain,
-			&i.HlsDurationSeconds,
 			&i.BytesFound,
+			&i.SeekPreviewsDomain,
 			&i.Public,
 			&i.SubOnly,
-			&i.SeekPreviewsDomain,
-			&i.StreamerID_2,
+			&i.HlsDurationSeconds,
 		); err != nil {
 			return nil, err
 		}

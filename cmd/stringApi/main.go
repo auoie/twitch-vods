@@ -40,12 +40,17 @@ func main() {
 	}
 	queries := sqlvods.New(conn)
 	router := httprouter.New()
+	router.GET("/", func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3001")
+		w.WriteHeader(http.StatusOK)
+	})
 	router.GET("/highest_viewed_private_available", func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3001")
 		results, err := queries.GetHighestViewedLiveStreams(ctx, sqlvods.GetHighestViewedLiveStreamsParams{
 			BytesFound:      sql.NullBool{Bool: true, Valid: true},
 			Public:          sql.NullBool{Bool: false, Valid: true},
 			LanguageAtStart: "EN",
-			Limit:           50,
+			Limit:           30,
 		})
 		if err != nil {
 			w.WriteHeader(500)
@@ -60,12 +65,13 @@ func main() {
 		w.Write(bytes)
 	})
 	router.GET("/channels/:streamer", func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3001")
 		name := p.ByName("streamer")
 		if name == "" {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		streams, err := queries.GetLatestStreamsFromStreamerLogin(ctx, sqlvods.GetLatestStreamsFromStreamerLoginParams{StreamerLoginAtStart: name, Limit: 50})
+		streams, err := queries.GetLatestStreamsFromStreamerLogin(ctx, sqlvods.GetLatestStreamsFromStreamerLoginParams{StreamerLoginAtStart: name, Limit: 30})
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			return

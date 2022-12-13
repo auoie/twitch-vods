@@ -21,7 +21,7 @@ ORDER BY
   start_time DESC
 LIMIT 1)
 SELECT
-  *
+  id, last_updated_at, max_views, start_time, s.streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start, is_mature_at_start, game_id_at_start, last_updated_minus_start_time_seconds, recording_fetched_at, hls_domain, bytes_found, seek_previews_domain, public, sub_only, hls_duration_seconds
 FROM
   streams s
 INNER JOIN
