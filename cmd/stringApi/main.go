@@ -16,36 +16,19 @@ import (
 	"github.com/julienschmidt/httprouter"
 )
 
-type TStreamResult struct {
-	Link     string
-	Metadata sqlvods.GetLatestStreamsFromStreamerLoginRow
+func addCors(f httprouter.Handle) httprouter.Handle {
+	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3001")
+		f(w, r, p)
+	}
 }
 
-func main() {
-	databaseUrl, ok := os.LookupEnv("DATABASE_URL")
-	if !ok {
-		databaseUrl = "postgresql://govods:password@localhost:5432/twitch"
-	}
-	ctx := context.Background()
-	conn, err := pgxpool.Connect(ctx, databaseUrl)
-	if err != nil {
-		log.Println(fmt.Sprint("failed to connect to ", databaseUrl, ": ", err))
-		log.Fatal(err)
-	}
-	err = conn.Ping(ctx)
-	if err != nil {
-		log.Println(fmt.Sprint("failed to ping ", databaseUrl, ": ", err))
-		conn.Close()
-		log.Fatal(err)
-	}
-	queries := sqlvods.New(conn)
-	router := httprouter.New()
-	router.GET("/", func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3001")
-		w.WriteHeader(http.StatusOK)
-	})
-	router.GET("/highest_viewed_private_available", func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3001")
+func okHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	w.WriteHeader(http.StatusOK)
+}
+
+func makeHighestViewedPrivateAvailableHandler(ctx context.Context, queries *sqlvods.Queries) httprouter.Handle {
+	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		results, err := queries.GetHighestViewedLiveStreams(ctx, sqlvods.GetHighestViewedLiveStreamsParams{
 			BytesFound:      sql.NullBool{Bool: true, Valid: true},
 			Public:          sql.NullBool{Bool: false, Valid: true},
@@ -63,9 +46,11 @@ func main() {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(bytes)
-	})
-	router.GET("/channels/:streamer", func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3001")
+	}
+}
+
+func makeStreamerHandler(ctx context.Context, queries *sqlvods.Queries) httprouter.Handle {
+	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		name := p.ByName("streamer")
 		if name == "" {
 			w.WriteHeader(http.StatusBadRequest)
@@ -91,8 +76,11 @@ func main() {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(bytes)
-	})
-	router.GET("/m3u8/:streamid/:unix/index.m3u8", func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	}
+}
+
+func makeM3U8Handler(ctx context.Context, queries *sqlvods.Queries) httprouter.Handle {
+	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		streamid := p.ByName("streamid")
 		if streamid == "" {
 			w.WriteHeader(http.StatusBadRequest)
@@ -127,6 +115,36 @@ func main() {
 		}
 		w.Header().Set("Content-Encoding", "gzip")
 		w.Write(streamBytes)
-	})
+	}
+}
+
+type TStreamResult struct {
+	Link     string
+	Metadata sqlvods.GetLatestStreamsFromStreamerLoginRow
+}
+
+func main() {
+	databaseUrl, ok := os.LookupEnv("DATABASE_URL")
+	if !ok {
+		databaseUrl = "postgresql://govods:password@localhost:5432/twitch"
+	}
+	ctx := context.Background()
+	conn, err := pgxpool.Connect(ctx, databaseUrl)
+	if err != nil {
+		log.Println(fmt.Sprint("failed to connect to ", databaseUrl, ": ", err))
+		log.Fatal(err)
+	}
+	err = conn.Ping(ctx)
+	if err != nil {
+		log.Println(fmt.Sprint("failed to ping ", databaseUrl, ": ", err))
+		conn.Close()
+		log.Fatal(err)
+	}
+	queries := sqlvods.New(conn)
+	router := httprouter.New()
+	router.GET("/", addCors(okHandler))
+	router.GET("/highest_viewed_private_available", addCors(makeHighestViewedPrivateAvailableHandler(ctx, queries)))
+	router.GET("/channels/:streamer", addCors(makeStreamerHandler(ctx, queries)))
+	router.GET("/m3u8/:streamid/:unix/index.m3u8", addCors(makeM3U8Handler(ctx, queries)))
 	http.ListenAndServe(":3000", router)
 }
