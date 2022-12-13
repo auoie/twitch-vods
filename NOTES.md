@@ -421,6 +421,22 @@ SELECT COUNT(*) FROM streams WHERE public = True AND last_updated_at BETWEEN NOW
 - There are several cases where the unix time in the hls format is 1 minus the unix time of the TwitchGQL start time.
   This is strange. My current approach doesn't completely work 100% of the time because if the first request times out, it won't even try the second request.
 
+## Unnecessary Cloudfront URLs
+
+- https://d2e2de1etea730.cloudfront.net/. Nothing.
+- https://d2aba1wr3818hz.cloudfront.net/. Nothing.
+- https://d3c27h4odz752x.cloudfront.net/. Nothing.
+- https://ddacn6pr5v0tl.cloudfront.net/. Nothing.
+- https://d3aqoihi2n8ty8.cloudfront.net/. Returns an XML file with the following metadata.
+
+  ```xml
+  <Name>bits-assets</Name>
+  <Prefix/>
+  <Marker/>
+  <MaxKeys>1000</MaxKeys>
+  <IsTruncated>true</IsTruncated>
+  ```
+
 ## TODO
 
 - On scraper restart, change from the live vod queue to a wait vod queue.

@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/4kills/go-libdeflate/v2 v2.0.2
 	github.com/Khan/genqlient v0.5.0
-	github.com/auoie/goVods v0.2.0
+	github.com/auoie/goVods v0.3.0
 	github.com/google/uuid v1.3.0
 	github.com/grafov/m3u8 v0.11.1
 	github.com/jackc/pgconn v1.13.0
