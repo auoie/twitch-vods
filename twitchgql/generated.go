@@ -894,6 +894,8 @@ type UserInfoVideosVideoConnectionEdgesVideoEdgeNodeVideo struct {
 	RecordedAt time.Time `json:"recordedAt"`
 	// Either PRIVATE or PUBLIC.
 	Scope VideoPrivacyScope `json:"scope"`
+	// The title of the video.
+	Title string `json:"title"`
 	// The game the video is depicting.
 	Game UserInfoVideosVideoConnectionEdgesVideoEdgeNodeVideoGame `json:"game"`
 	// A link to a sprite sheet image made up of preview thumbnails when seeking the video timeline.
@@ -951,6 +953,9 @@ func (v *UserInfoVideosVideoConnectionEdgesVideoEdgeNodeVideo) GetRecordedAt() t
 func (v *UserInfoVideosVideoConnectionEdgesVideoEdgeNodeVideo) GetScope() VideoPrivacyScope {
 	return v.Scope
 }
+
+// GetTitle returns UserInfoVideosVideoConnectionEdgesVideoEdgeNodeVideo.Title, and is useful for accessing the field via an interface.
+func (v *UserInfoVideosVideoConnectionEdgesVideoEdgeNodeVideo) GetTitle() string { return v.Title }
 
 // GetGame returns UserInfoVideosVideoConnectionEdgesVideoEdgeNodeVideo.Game, and is useful for accessing the field via an interface.
 func (v *UserInfoVideosVideoConnectionEdgesVideoEdgeNodeVideo) GetGame() UserInfoVideosVideoConnectionEdgesVideoEdgeNodeVideoGame {
@@ -1184,6 +1189,7 @@ fragment UserInfo on User {
 				publishedAt
 				recordedAt
 				scope
+				title
 				game {
 					id
 					name

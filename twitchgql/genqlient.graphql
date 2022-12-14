@@ -57,6 +57,7 @@ fragment UserInfo on User {
         publishedAt
         recordedAt
         scope
+        title
         game {
           id
           name
