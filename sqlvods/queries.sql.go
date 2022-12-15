@@ -84,38 +84,47 @@ func (q *Queries) GetEverything(ctx context.Context) ([]Stream, error) {
 
 const getHighestViewedLiveStreams = `-- name: GetHighestViewedLiveStreams :many
 SELECT
-  streamer_login_at_start, title_at_start, max_views, start_time, stream_id
+  id, last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start, is_mature_at_start, game_id_at_start, last_updated_minus_start_time_seconds, recording_fetched_at, hls_domain, bytes_found, seek_previews_domain, public, sub_only, hls_duration_seconds
 FROM
   streams
 WHERE
-  bytes_found = $1 AND public = $2 AND language_at_start = $3
+  public = $1 AND sub_only = $2
 ORDER BY
   max_views DESC
-LIMIT $4
+LIMIT $3
 `
 
 type GetHighestViewedLiveStreamsParams struct {
-	BytesFound      sql.NullBool
-	Public          sql.NullBool
-	LanguageAtStart string
-	Limit           int32
+	Public  sql.NullBool
+	SubOnly sql.NullBool
+	Limit   int32
 }
 
 type GetHighestViewedLiveStreamsRow struct {
-	StreamerLoginAtStart string
-	TitleAtStart         string
-	MaxViews             int64
-	StartTime            time.Time
-	StreamID             string
+	ID                               uuid.UUID
+	LastUpdatedAt                    time.Time
+	MaxViews                         int64
+	StartTime                        time.Time
+	StreamerID                       string
+	StreamID                         string
+	StreamerLoginAtStart             string
+	GameNameAtStart                  string
+	LanguageAtStart                  string
+	TitleAtStart                     string
+	IsMatureAtStart                  bool
+	GameIDAtStart                    string
+	LastUpdatedMinusStartTimeSeconds float64
+	RecordingFetchedAt               sql.NullTime
+	HlsDomain                        sql.NullString
+	BytesFound                       sql.NullBool
+	SeekPreviewsDomain               sql.NullString
+	Public                           sql.NullBool
+	SubOnly                          sql.NullBool
+	HlsDurationSeconds               sql.NullFloat64
 }
 
 func (q *Queries) GetHighestViewedLiveStreams(ctx context.Context, arg GetHighestViewedLiveStreamsParams) ([]GetHighestViewedLiveStreamsRow, error) {
-	rows, err := q.db.Query(ctx, getHighestViewedLiveStreams,
-		arg.BytesFound,
-		arg.Public,
-		arg.LanguageAtStart,
-		arg.Limit,
-	)
+	rows, err := q.db.Query(ctx, getHighestViewedLiveStreams, arg.Public, arg.SubOnly, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -124,11 +133,26 @@ func (q *Queries) GetHighestViewedLiveStreams(ctx context.Context, arg GetHighes
 	for rows.Next() {
 		var i GetHighestViewedLiveStreamsRow
 		if err := rows.Scan(
-			&i.StreamerLoginAtStart,
-			&i.TitleAtStart,
+			&i.ID,
+			&i.LastUpdatedAt,
 			&i.MaxViews,
 			&i.StartTime,
+			&i.StreamerID,
 			&i.StreamID,
+			&i.StreamerLoginAtStart,
+			&i.GameNameAtStart,
+			&i.LanguageAtStart,
+			&i.TitleAtStart,
+			&i.IsMatureAtStart,
+			&i.GameIDAtStart,
+			&i.LastUpdatedMinusStartTimeSeconds,
+			&i.RecordingFetchedAt,
+			&i.HlsDomain,
+			&i.BytesFound,
+			&i.SeekPreviewsDomain,
+			&i.Public,
+			&i.SubOnly,
+			&i.HlsDurationSeconds,
 		); err != nil {
 			return nil, err
 		}

@@ -30,16 +30,23 @@ func okHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 func makeHighestViewedPrivateAvailableHandler(ctx context.Context, queries *sqlvods.Queries) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		results, err := queries.GetHighestViewedLiveStreams(ctx, sqlvods.GetHighestViewedLiveStreamsParams{
-			BytesFound:      sql.NullBool{Bool: true, Valid: true},
-			Public:          sql.NullBool{Bool: false, Valid: true},
-			LanguageAtStart: "EN",
-			Limit:           100,
+			Public:  sql.NullBool{Bool: false, Valid: true},
+			SubOnly: sql.NullBool{Bool: true, Valid: true},
+			Limit:   100,
 		})
+		streamResults := []TStreamResult{}
+		for _, stream := range results {
+			streamResults = append(streamResults, TStreamResult{
+				Metadata: sqlvods.GetLatestStreamsFromStreamerLoginRow(stream),
+				Link: fmt.Sprint("/m3u8/", stream.StreamID, "/",
+					stream.StartTime.Unix(), "/index.m3u8"),
+			})
+		}
 		if err != nil {
 			w.WriteHeader(500)
 			return
 		}
-		bytes, err := json.Marshal(results)
+		bytes, err := json.Marshal(streamResults)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
