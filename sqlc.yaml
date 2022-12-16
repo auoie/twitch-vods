@@ -8,3 +8,4 @@ sql:
         package: "sqlvods"
         out: "sqlvods"
         sql_package: "pgx/v4"
+        emit_result_struct_pointers: true

@@ -40,13 +40,13 @@ FROM
   streams s
 `
 
-func (q *Queries) GetEverything(ctx context.Context) ([]Stream, error) {
+func (q *Queries) GetEverything(ctx context.Context) ([]*Stream, error) {
 	rows, err := q.db.Query(ctx, getEverything)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Stream
+	var items []*Stream
 	for rows.Next() {
 		var i Stream
 		if err := rows.Scan(
@@ -74,89 +74,7 @@ func (q *Queries) GetEverything(ctx context.Context) ([]Stream, error) {
 		); err != nil {
 			return nil, err
 		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getHighestViewedLiveStreams = `-- name: GetHighestViewedLiveStreams :many
-SELECT
-  id, last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start, is_mature_at_start, game_id_at_start, last_updated_minus_start_time_seconds, recording_fetched_at, hls_domain, bytes_found, seek_previews_domain, public, sub_only, hls_duration_seconds
-FROM
-  streams
-WHERE
-  public = $1 AND sub_only = $2
-ORDER BY
-  max_views DESC
-LIMIT $3
-`
-
-type GetHighestViewedLiveStreamsParams struct {
-	Public  sql.NullBool
-	SubOnly sql.NullBool
-	Limit   int32
-}
-
-type GetHighestViewedLiveStreamsRow struct {
-	ID                               uuid.UUID
-	LastUpdatedAt                    time.Time
-	MaxViews                         int64
-	StartTime                        time.Time
-	StreamerID                       string
-	StreamID                         string
-	StreamerLoginAtStart             string
-	GameNameAtStart                  string
-	LanguageAtStart                  string
-	TitleAtStart                     string
-	IsMatureAtStart                  bool
-	GameIDAtStart                    string
-	LastUpdatedMinusStartTimeSeconds float64
-	RecordingFetchedAt               sql.NullTime
-	HlsDomain                        sql.NullString
-	BytesFound                       sql.NullBool
-	SeekPreviewsDomain               sql.NullString
-	Public                           sql.NullBool
-	SubOnly                          sql.NullBool
-	HlsDurationSeconds               sql.NullFloat64
-}
-
-func (q *Queries) GetHighestViewedLiveStreams(ctx context.Context, arg GetHighestViewedLiveStreamsParams) ([]GetHighestViewedLiveStreamsRow, error) {
-	rows, err := q.db.Query(ctx, getHighestViewedLiveStreams, arg.Public, arg.SubOnly, arg.Limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []GetHighestViewedLiveStreamsRow
-	for rows.Next() {
-		var i GetHighestViewedLiveStreamsRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.LastUpdatedAt,
-			&i.MaxViews,
-			&i.StartTime,
-			&i.StreamerID,
-			&i.StreamID,
-			&i.StreamerLoginAtStart,
-			&i.GameNameAtStart,
-			&i.LanguageAtStart,
-			&i.TitleAtStart,
-			&i.IsMatureAtStart,
-			&i.GameIDAtStart,
-			&i.LastUpdatedMinusStartTimeSeconds,
-			&i.RecordingFetchedAt,
-			&i.HlsDomain,
-			&i.BytesFound,
-			&i.SeekPreviewsDomain,
-			&i.Public,
-			&i.SubOnly,
-			&i.HlsDurationSeconds,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
+		items = append(items, &i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -184,13 +102,13 @@ type GetLatestLiveStreamsRow struct {
 	LastUpdatedAt        time.Time
 }
 
-func (q *Queries) GetLatestLiveStreams(ctx context.Context, lastUpdatedAt time.Time) ([]GetLatestLiveStreamsRow, error) {
+func (q *Queries) GetLatestLiveStreams(ctx context.Context, lastUpdatedAt time.Time) ([]*GetLatestLiveStreamsRow, error) {
 	rows, err := q.db.Query(ctx, getLatestLiveStreams, lastUpdatedAt)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []GetLatestLiveStreamsRow
+	var items []*GetLatestLiveStreamsRow
 	for rows.Next() {
 		var i GetLatestLiveStreamsRow
 		if err := rows.Scan(
@@ -204,7 +122,7 @@ func (q *Queries) GetLatestLiveStreams(ctx context.Context, lastUpdatedAt time.T
 		); err != nil {
 			return nil, err
 		}
-		items = append(items, i)
+		items = append(items, &i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -231,13 +149,13 @@ type GetLatestStreamsRow struct {
 	LastUpdatedAt time.Time
 }
 
-func (q *Queries) GetLatestStreams(ctx context.Context, limit int32) ([]GetLatestStreamsRow, error) {
+func (q *Queries) GetLatestStreams(ctx context.Context, limit int32) ([]*GetLatestStreamsRow, error) {
 	rows, err := q.db.Query(ctx, getLatestStreams, limit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []GetLatestStreamsRow
+	var items []*GetLatestStreamsRow
 	for rows.Next() {
 		var i GetLatestStreamsRow
 		if err := rows.Scan(
@@ -250,7 +168,7 @@ func (q *Queries) GetLatestStreams(ctx context.Context, limit int32) ([]GetLates
 		); err != nil {
 			return nil, err
 		}
-		items = append(items, i)
+		items = append(items, &i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -311,13 +229,13 @@ type GetLatestStreamsFromStreamerLoginRow struct {
 	HlsDurationSeconds               sql.NullFloat64
 }
 
-func (q *Queries) GetLatestStreamsFromStreamerLogin(ctx context.Context, arg GetLatestStreamsFromStreamerLoginParams) ([]GetLatestStreamsFromStreamerLoginRow, error) {
+func (q *Queries) GetLatestStreamsFromStreamerLogin(ctx context.Context, arg GetLatestStreamsFromStreamerLoginParams) ([]*GetLatestStreamsFromStreamerLoginRow, error) {
 	rows, err := q.db.Query(ctx, getLatestStreamsFromStreamerLogin, arg.StreamerLoginAtStart, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []GetLatestStreamsFromStreamerLoginRow
+	var items []*GetLatestStreamsFromStreamerLoginRow
 	for rows.Next() {
 		var i GetLatestStreamsFromStreamerLoginRow
 		if err := rows.Scan(
@@ -344,7 +262,89 @@ func (q *Queries) GetLatestStreamsFromStreamerLogin(ctx context.Context, arg Get
 		); err != nil {
 			return nil, err
 		}
-		items = append(items, i)
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPopularLiveStreams = `-- name: GetPopularLiveStreams :many
+SELECT
+  id, last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start, is_mature_at_start, game_id_at_start, last_updated_minus_start_time_seconds, recording_fetched_at, hls_domain, bytes_found, seek_previews_domain, public, sub_only, hls_duration_seconds
+FROM
+  streams
+WHERE
+  public = $1 AND sub_only = $2
+ORDER BY
+  max_views DESC
+LIMIT $3
+`
+
+type GetPopularLiveStreamsParams struct {
+	Public  sql.NullBool
+	SubOnly sql.NullBool
+	Limit   int32
+}
+
+type GetPopularLiveStreamsRow struct {
+	ID                               uuid.UUID
+	LastUpdatedAt                    time.Time
+	MaxViews                         int64
+	StartTime                        time.Time
+	StreamerID                       string
+	StreamID                         string
+	StreamerLoginAtStart             string
+	GameNameAtStart                  string
+	LanguageAtStart                  string
+	TitleAtStart                     string
+	IsMatureAtStart                  bool
+	GameIDAtStart                    string
+	LastUpdatedMinusStartTimeSeconds float64
+	RecordingFetchedAt               sql.NullTime
+	HlsDomain                        sql.NullString
+	BytesFound                       sql.NullBool
+	SeekPreviewsDomain               sql.NullString
+	Public                           sql.NullBool
+	SubOnly                          sql.NullBool
+	HlsDurationSeconds               sql.NullFloat64
+}
+
+func (q *Queries) GetPopularLiveStreams(ctx context.Context, arg GetPopularLiveStreamsParams) ([]*GetPopularLiveStreamsRow, error) {
+	rows, err := q.db.Query(ctx, getPopularLiveStreams, arg.Public, arg.SubOnly, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*GetPopularLiveStreamsRow
+	for rows.Next() {
+		var i GetPopularLiveStreamsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.LastUpdatedAt,
+			&i.MaxViews,
+			&i.StartTime,
+			&i.StreamerID,
+			&i.StreamID,
+			&i.StreamerLoginAtStart,
+			&i.GameNameAtStart,
+			&i.LanguageAtStart,
+			&i.TitleAtStart,
+			&i.IsMatureAtStart,
+			&i.GameIDAtStart,
+			&i.LastUpdatedMinusStartTimeSeconds,
+			&i.RecordingFetchedAt,
+			&i.HlsDomain,
+			&i.BytesFound,
+			&i.SeekPreviewsDomain,
+			&i.Public,
+			&i.SubOnly,
+			&i.HlsDurationSeconds,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

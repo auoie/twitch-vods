@@ -34,11 +34,8 @@ model streams {
   @@index([last_updated_at]) // used to get most recently updated stream
   @@index([start_time]) // used to delete oldest streams
 
-  @@index([public, sub_only, start_time, id])
-  @@index([public, sub_only, max_views, id])
+  @@index([public, sub_only, max_views, id]) // filter by public, sub_only then sort by (max_views, id) DESC
 
-  @@index([game_name_at_start, public, sub_only, bytes_found, start_time, id])
-  @@index([language_at_start, public, sub_only, bytes_found, start_time, id])
-  @@index([game_name_at_start, public, sub_only, bytes_found, max_views, id])
-  @@index([language_at_start, public, sub_only, bytes_found, max_views, id])
+  @@index([game_name_at_start, public, sub_only, max_views, id]) // filter by (game_name_at_start, public, sub_only) then sort by (max_views, id) DESC
+  @@index([language_at_start, public, sub_only, max_views, id]) // filter by (language_at_start, public, sub_only) then sort by (max_views, id) DESC
 }
