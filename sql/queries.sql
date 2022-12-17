@@ -98,8 +98,30 @@ FROM
 WHERE
   public = $1 AND sub_only = $2
 ORDER BY
-  max_views DESC
+  max_views DESC, id DESC
 LIMIT $3;
+
+-- name: GetPopularLiveStreamsByLanguage :many
+SELECT
+  id, max_views, start_time, streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start, is_mature_at_start, game_id_at_start, bytes_found, public, sub_only, hls_duration_seconds
+FROM
+  streams
+WHERE
+  language_at_start = $1 AND public = $2 AND sub_only = $3
+ORDER BY
+  max_views DESC, id DESC
+LIMIT $4;
+
+-- name: GetPopularLiveStreamsByGameId :many
+SELECT
+  id, max_views, start_time, streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start, is_mature_at_start, game_id_at_start, bytes_found, public, sub_only, hls_duration_seconds
+FROM
+  streams
+WHERE
+  game_id_at_start = $1 AND public = $2 AND sub_only = $3
+ORDER BY
+  max_views DESC, id DESC
+LIMIT $4;
 
 -- name: DeleteOldStreams :exec
 DELETE FROM streams

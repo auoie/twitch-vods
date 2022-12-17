@@ -36,6 +36,6 @@ model streams {
 
   @@index([public, sub_only, max_views, id]) // filter by public, sub_only then sort by (max_views, id) DESC
 
-  @@index([game_name_at_start, public, sub_only, max_views, id]) // filter by (game_name_at_start, public, sub_only) then sort by (max_views, id) DESC
+  @@index([game_id_at_start, public, sub_only, max_views, id]) // filter by (game_id_at_start, public, sub_only) then sort by (max_views, id) DESC
   @@index([language_at_start, public, sub_only, max_views, id]) // filter by (language_at_start, public, sub_only) then sort by (max_views, id) DESC
 }

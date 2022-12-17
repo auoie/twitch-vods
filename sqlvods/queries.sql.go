@@ -268,7 +268,7 @@ FROM
 WHERE
   public = $1 AND sub_only = $2
 ORDER BY
-  max_views DESC
+  max_views DESC, id DESC
 LIMIT $3
 `
 
@@ -305,6 +305,162 @@ func (q *Queries) GetPopularLiveStreams(ctx context.Context, arg GetPopularLiveS
 	var items []*GetPopularLiveStreamsRow
 	for rows.Next() {
 		var i GetPopularLiveStreamsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.MaxViews,
+			&i.StartTime,
+			&i.StreamerID,
+			&i.StreamID,
+			&i.StreamerLoginAtStart,
+			&i.GameNameAtStart,
+			&i.LanguageAtStart,
+			&i.TitleAtStart,
+			&i.IsMatureAtStart,
+			&i.GameIDAtStart,
+			&i.BytesFound,
+			&i.Public,
+			&i.SubOnly,
+			&i.HlsDurationSeconds,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPopularLiveStreamsByGameId = `-- name: GetPopularLiveStreamsByGameId :many
+SELECT
+  id, max_views, start_time, streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start, is_mature_at_start, game_id_at_start, bytes_found, public, sub_only, hls_duration_seconds
+FROM
+  streams
+WHERE
+  game_id_at_start = $1 AND public = $2 AND sub_only = $3
+ORDER BY
+  max_views DESC, id DESC
+LIMIT $4
+`
+
+type GetPopularLiveStreamsByGameIdParams struct {
+	GameIDAtStart string
+	Public        sql.NullBool
+	SubOnly       sql.NullBool
+	Limit         int32
+}
+
+type GetPopularLiveStreamsByGameIdRow struct {
+	ID                   uuid.UUID
+	MaxViews             int64
+	StartTime            time.Time
+	StreamerID           string
+	StreamID             string
+	StreamerLoginAtStart string
+	GameNameAtStart      string
+	LanguageAtStart      string
+	TitleAtStart         string
+	IsMatureAtStart      bool
+	GameIDAtStart        string
+	BytesFound           sql.NullBool
+	Public               sql.NullBool
+	SubOnly              sql.NullBool
+	HlsDurationSeconds   sql.NullFloat64
+}
+
+func (q *Queries) GetPopularLiveStreamsByGameId(ctx context.Context, arg GetPopularLiveStreamsByGameIdParams) ([]*GetPopularLiveStreamsByGameIdRow, error) {
+	rows, err := q.db.Query(ctx, getPopularLiveStreamsByGameId,
+		arg.GameIDAtStart,
+		arg.Public,
+		arg.SubOnly,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*GetPopularLiveStreamsByGameIdRow
+	for rows.Next() {
+		var i GetPopularLiveStreamsByGameIdRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.MaxViews,
+			&i.StartTime,
+			&i.StreamerID,
+			&i.StreamID,
+			&i.StreamerLoginAtStart,
+			&i.GameNameAtStart,
+			&i.LanguageAtStart,
+			&i.TitleAtStart,
+			&i.IsMatureAtStart,
+			&i.GameIDAtStart,
+			&i.BytesFound,
+			&i.Public,
+			&i.SubOnly,
+			&i.HlsDurationSeconds,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPopularLiveStreamsByLanguage = `-- name: GetPopularLiveStreamsByLanguage :many
+SELECT
+  id, max_views, start_time, streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start, is_mature_at_start, game_id_at_start, bytes_found, public, sub_only, hls_duration_seconds
+FROM
+  streams
+WHERE
+  language_at_start = $1 AND public = $2 AND sub_only = $3
+ORDER BY
+  max_views DESC, id DESC
+LIMIT $4
+`
+
+type GetPopularLiveStreamsByLanguageParams struct {
+	LanguageAtStart string
+	Public          sql.NullBool
+	SubOnly         sql.NullBool
+	Limit           int32
+}
+
+type GetPopularLiveStreamsByLanguageRow struct {
+	ID                   uuid.UUID
+	MaxViews             int64
+	StartTime            time.Time
+	StreamerID           string
+	StreamID             string
+	StreamerLoginAtStart string
+	GameNameAtStart      string
+	LanguageAtStart      string
+	TitleAtStart         string
+	IsMatureAtStart      bool
+	GameIDAtStart        string
+	BytesFound           sql.NullBool
+	Public               sql.NullBool
+	SubOnly              sql.NullBool
+	HlsDurationSeconds   sql.NullFloat64
+}
+
+func (q *Queries) GetPopularLiveStreamsByLanguage(ctx context.Context, arg GetPopularLiveStreamsByLanguageParams) ([]*GetPopularLiveStreamsByLanguageRow, error) {
+	rows, err := q.db.Query(ctx, getPopularLiveStreamsByLanguage,
+		arg.LanguageAtStart,
+		arg.Public,
+		arg.SubOnly,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*GetPopularLiveStreamsByLanguageRow
+	for rows.Next() {
+		var i GetPopularLiveStreamsByLanguageRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.MaxViews,
