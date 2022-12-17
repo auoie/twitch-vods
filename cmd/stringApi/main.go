@@ -88,6 +88,37 @@ func makeAllLanguageHandler(ctx context.Context, queries *sqlvods.Queries) httpr
 	}
 }
 
+func makeAllCategoryHandler(ctx context.Context, queries *sqlvods.Queries) httprouter.Handle {
+	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+		results, err := queries.GetPopularLiveStreamsByGameId(ctx, sqlvods.GetPopularLiveStreamsByGameIdParams{
+			GameIDAtStart: p.ByName("game-id"),
+			Public:        sql.NullBool{Bool: p.ByName("pub-status") == "public", Valid: true},
+			SubOnly:       sql.NullBool{Bool: p.ByName("sub-status") == "sub", Valid: true},
+			Limit:         100,
+		})
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		streamResults := []TStreamResult{}
+		for _, stream := range results {
+			streamResults = append(streamResults, TStreamResult{
+				Metadata: (*sqlvods.GetLatestStreamsFromStreamerLoginRow)(stream),
+				Link: fmt.Sprint("/m3u8/", stream.StreamID, "/",
+					stream.StartTime.Unix(), "/index.m3u8"),
+			})
+		}
+		bytes, err := json.Marshal(streamResults)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Length", strconv.Itoa(len(bytes)))
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(bytes)
+	}
+}
+
 func makeStreamerHandler(ctx context.Context, queries *sqlvods.Queries) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		name := p.ByName("streamer")
@@ -194,5 +225,6 @@ func main() {
 	router.GET("/channels/:streamer", addCors(makeStreamerHandler(ctx, queries)))
 	router.GET("/m3u8/:streamid/:unix/index.m3u8", addCors(makeM3U8Handler(ctx, queries)))
 	router.GET("/language/:language/all/:pub-status/:sub-status", addCors(makeAllLanguageHandler(ctx, queries)))
+	router.GET("/category/:game-id/all/:pub-status/:sub-status", addCors(makeAllCategoryHandler(ctx, queries)))
 	http.ListenAndServe(":3000", router)
 }
