@@ -38,6 +38,10 @@ func makeMostViewedHandler(ctx context.Context, queries *sqlvods.Queries) httpro
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
+		if len(results) == 0 {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
 		streamResults := []TStreamResult{}
 		for _, stream := range results {
 			streamResults = append(streamResults, TStreamResult{
@@ -69,6 +73,10 @@ func makeAllLanguageHandler(ctx context.Context, queries *sqlvods.Queries) httpr
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
+		if len(results) == 0 {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
 		streamResults := []TStreamResult{}
 		for _, stream := range results {
 			streamResults = append(streamResults, TStreamResult{
@@ -98,6 +106,10 @@ func makeAllCategoryHandler(ctx context.Context, queries *sqlvods.Queries) httpr
 		})
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		if len(results) == 0 {
+			w.WriteHeader(http.StatusNotFound)
 			return
 		}
 		streamResults := []TStreamResult{}
