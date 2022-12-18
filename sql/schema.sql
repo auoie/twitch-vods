@@ -13,6 +13,8 @@ CREATE TABLE "streams" (
     "game_id_at_start" TEXT NOT NULL,
     "is_mature_at_start" BOOLEAN NOT NULL,
     "last_updated_minus_start_time_seconds" DOUBLE PRECISION NOT NULL,
+    "box_art_url_at_start" TEXT NOT NULL,
+    "profile_image_url_at_start" TEXT NOT NULL,
     "recording_fetched_at" TIMESTAMP(3),
     "gzipped_bytes" BYTEA,
     "hls_domain" TEXT,

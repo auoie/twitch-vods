@@ -12,6 +12,7 @@ query GetStreams($first: Int!, $cursor: Cursor!) {
         broadcaster {
           id
           login
+          profileImageURL(width: 50)
           broadcastSettings {
             isMature
             language
@@ -21,6 +22,7 @@ query GetStreams($first: Int!, $cursor: Cursor!) {
         game {
           name
           id
+          boxArtURL(width: 40, height: 56)
         }
         viewersCount
         createdAt
@@ -33,6 +35,7 @@ query GetStreams($first: Int!, $cursor: Cursor!) {
 fragment UserInfo on User {
   login
   id
+  profileImageURL(width: 50)
   lastBroadcast {
     id
     startedAt
@@ -40,6 +43,7 @@ fragment UserInfo on User {
       id
       name
       displayName
+      boxArtURL(width: 40, height: 56)
     }
   }
   broadcastSettings {
@@ -61,6 +65,7 @@ fragment UserInfo on User {
         game {
           id
           name
+          boxArtURL(width: 40, height: 56)
         }
         seekPreviewsURL
         broadcastType

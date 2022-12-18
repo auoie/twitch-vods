@@ -108,6 +108,8 @@ func twitchGqlResponseToSqlParams(
 		result.GameIDAtStartArr = append(result.GameIDAtStartArr, node.Game.Id)
 		result.IsMatureAtStartArr = append(result.IsMatureAtStartArr, node.Broadcaster.BroadcastSettings.IsMature)
 		result.LastUpdatedMinusStartTimeSecondsArr = append(result.LastUpdatedMinusStartTimeSecondsArr, responseReturnedTime.Sub(node.CreatedAt.UTC()).Seconds())
+		result.BoxArtUrlAtStartAtStartArr = append(result.BoxArtUrlAtStartAtStartArr, node.Game.BoxArtURL)
+		result.ProfileImageUrlAtStartArr = append(result.ProfileImageUrlAtStartArr, node.Broadcaster.ProfileImageURL)
 	}
 	return result
 }

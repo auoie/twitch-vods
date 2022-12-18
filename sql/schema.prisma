@@ -15,6 +15,8 @@ model streams {
   title_at_start                        String
   game_name_at_start                    String
   game_id_at_start                      String
+  profile_image_url_at_start            String
+  box_art_url_at_start                  String
   is_mature_at_start                    Boolean
   last_updated_minus_start_time_seconds Float
 

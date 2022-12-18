@@ -126,6 +126,10 @@ type GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStreamBroadcasterUser s
 	Id string `json:"id"`
 	// The user's standard alphanumeric Twitch name.
 	Login string `json:"login"`
+	// A URL to the user's profile image.
+	// Valid widths are 28, 50, 70, 96, 150, 300, and 600.
+	// The image height will be the same as the given width.
+	ProfileImageURL string `json:"profileImageURL"`
 	// A User's broadcast settings that persists between streams.
 	BroadcastSettings GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStreamBroadcasterUserBroadcastSettings `json:"broadcastSettings"`
 }
@@ -138,6 +142,11 @@ func (v *GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStreamBroadcasterUs
 // GetLogin returns GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStreamBroadcasterUser.Login, and is useful for accessing the field via an interface.
 func (v *GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStreamBroadcasterUser) GetLogin() string {
 	return v.Login
+}
+
+// GetProfileImageURL returns GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStreamBroadcasterUser.ProfileImageURL, and is useful for accessing the field via an interface.
+func (v *GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStreamBroadcasterUser) GetProfileImageURL() string {
+	return v.ProfileImageURL
 }
 
 // GetBroadcastSettings returns GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStreamBroadcasterUser.BroadcastSettings, and is useful for accessing the field via an interface.
@@ -186,6 +195,12 @@ type GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStreamGame struct {
 	// The game's unique Twitch identifier.
 	// It is used to associate games with product offers.
 	Id string `json:"id"`
+	// URL to a box art image.
+	// The image dimensions are specifiable via the `height` and `width` parameters.
+	//
+	// If `height` or `width` are not specified, the URL will contain
+	// the template strings `{height}` and/or `{width}` in their respective places.
+	BoxArtURL string `json:"boxArtURL"`
 }
 
 // GetName returns GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStreamGame.Name, and is useful for accessing the field via an interface.
@@ -195,6 +210,11 @@ func (v *GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStreamGame) GetName
 
 // GetId returns GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStreamGame.Id, and is useful for accessing the field via an interface.
 func (v *GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStreamGame) GetId() string { return v.Id }
+
+// GetBoxArtURL returns GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStreamGame.BoxArtURL, and is useful for accessing the field via an interface.
+func (v *GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStreamGame) GetBoxArtURL() string {
+	return v.BoxArtURL
+}
 
 // GetStreamsStreamsStreamConnectionPageInfo includes the requested fields of the GraphQL type PageInfo.
 // The GraphQL type's documentation follows.
@@ -254,6 +274,9 @@ func (v *GetThreeUsersUser1User) GetLogin() string { return v.UserInfo.Login }
 // GetId returns GetThreeUsersUser1User.Id, and is useful for accessing the field via an interface.
 func (v *GetThreeUsersUser1User) GetId() string { return v.UserInfo.Id }
 
+// GetProfileImageURL returns GetThreeUsersUser1User.ProfileImageURL, and is useful for accessing the field via an interface.
+func (v *GetThreeUsersUser1User) GetProfileImageURL() string { return v.UserInfo.ProfileImageURL }
+
 // GetLastBroadcast returns GetThreeUsersUser1User.LastBroadcast, and is useful for accessing the field via an interface.
 func (v *GetThreeUsersUser1User) GetLastBroadcast() UserInfoLastBroadcast {
 	return v.UserInfo.LastBroadcast
@@ -302,6 +325,8 @@ type __premarshalGetThreeUsersUser1User struct {
 
 	Id string `json:"id"`
 
+	ProfileImageURL string `json:"profileImageURL"`
+
 	LastBroadcast UserInfoLastBroadcast `json:"lastBroadcast"`
 
 	BroadcastSettings UserInfoBroadcastSettings `json:"broadcastSettings"`
@@ -324,6 +349,7 @@ func (v *GetThreeUsersUser1User) __premarshalJSON() (*__premarshalGetThreeUsersU
 
 	retval.Login = v.UserInfo.Login
 	retval.Id = v.UserInfo.Id
+	retval.ProfileImageURL = v.UserInfo.ProfileImageURL
 	retval.LastBroadcast = v.UserInfo.LastBroadcast
 	retval.BroadcastSettings = v.UserInfo.BroadcastSettings
 	retval.Videos = v.UserInfo.Videos
@@ -344,6 +370,9 @@ func (v *GetThreeUsersUser2User) GetLogin() string { return v.UserInfo.Login }
 
 // GetId returns GetThreeUsersUser2User.Id, and is useful for accessing the field via an interface.
 func (v *GetThreeUsersUser2User) GetId() string { return v.UserInfo.Id }
+
+// GetProfileImageURL returns GetThreeUsersUser2User.ProfileImageURL, and is useful for accessing the field via an interface.
+func (v *GetThreeUsersUser2User) GetProfileImageURL() string { return v.UserInfo.ProfileImageURL }
 
 // GetLastBroadcast returns GetThreeUsersUser2User.LastBroadcast, and is useful for accessing the field via an interface.
 func (v *GetThreeUsersUser2User) GetLastBroadcast() UserInfoLastBroadcast {
@@ -393,6 +422,8 @@ type __premarshalGetThreeUsersUser2User struct {
 
 	Id string `json:"id"`
 
+	ProfileImageURL string `json:"profileImageURL"`
+
 	LastBroadcast UserInfoLastBroadcast `json:"lastBroadcast"`
 
 	BroadcastSettings UserInfoBroadcastSettings `json:"broadcastSettings"`
@@ -415,6 +446,7 @@ func (v *GetThreeUsersUser2User) __premarshalJSON() (*__premarshalGetThreeUsersU
 
 	retval.Login = v.UserInfo.Login
 	retval.Id = v.UserInfo.Id
+	retval.ProfileImageURL = v.UserInfo.ProfileImageURL
 	retval.LastBroadcast = v.UserInfo.LastBroadcast
 	retval.BroadcastSettings = v.UserInfo.BroadcastSettings
 	retval.Videos = v.UserInfo.Videos
@@ -435,6 +467,9 @@ func (v *GetThreeUsersUser3User) GetLogin() string { return v.UserInfo.Login }
 
 // GetId returns GetThreeUsersUser3User.Id, and is useful for accessing the field via an interface.
 func (v *GetThreeUsersUser3User) GetId() string { return v.UserInfo.Id }
+
+// GetProfileImageURL returns GetThreeUsersUser3User.ProfileImageURL, and is useful for accessing the field via an interface.
+func (v *GetThreeUsersUser3User) GetProfileImageURL() string { return v.UserInfo.ProfileImageURL }
 
 // GetLastBroadcast returns GetThreeUsersUser3User.LastBroadcast, and is useful for accessing the field via an interface.
 func (v *GetThreeUsersUser3User) GetLastBroadcast() UserInfoLastBroadcast {
@@ -484,6 +519,8 @@ type __premarshalGetThreeUsersUser3User struct {
 
 	Id string `json:"id"`
 
+	ProfileImageURL string `json:"profileImageURL"`
+
 	LastBroadcast UserInfoLastBroadcast `json:"lastBroadcast"`
 
 	BroadcastSettings UserInfoBroadcastSettings `json:"broadcastSettings"`
@@ -506,6 +543,7 @@ func (v *GetThreeUsersUser3User) __premarshalJSON() (*__premarshalGetThreeUsersU
 
 	retval.Login = v.UserInfo.Login
 	retval.Id = v.UserInfo.Id
+	retval.ProfileImageURL = v.UserInfo.ProfileImageURL
 	retval.LastBroadcast = v.UserInfo.LastBroadcast
 	retval.BroadcastSettings = v.UserInfo.BroadcastSettings
 	retval.Videos = v.UserInfo.Videos
@@ -708,6 +746,10 @@ type UserInfo struct {
 	Login string `json:"login"`
 	// The user's unique identifier.
 	Id string `json:"id"`
+	// A URL to the user's profile image.
+	// Valid widths are 28, 50, 70, 96, 150, 300, and 600.
+	// The image height will be the same as the given width.
+	ProfileImageURL string `json:"profileImageURL"`
 	// The user's last broadcast.
 	LastBroadcast UserInfoLastBroadcast `json:"lastBroadcast"`
 	// A User's broadcast settings that persists between streams.
@@ -723,6 +765,9 @@ func (v *UserInfo) GetLogin() string { return v.Login }
 
 // GetId returns UserInfo.Id, and is useful for accessing the field via an interface.
 func (v *UserInfo) GetId() string { return v.Id }
+
+// GetProfileImageURL returns UserInfo.ProfileImageURL, and is useful for accessing the field via an interface.
+func (v *UserInfo) GetProfileImageURL() string { return v.ProfileImageURL }
 
 // GetLastBroadcast returns UserInfo.LastBroadcast, and is useful for accessing the field via an interface.
 func (v *UserInfo) GetLastBroadcast() UserInfoLastBroadcast { return v.LastBroadcast }
@@ -798,6 +843,12 @@ type UserInfoLastBroadcastGame struct {
 	// The translated game name used for display purposes.
 	// Use name for tracking props or URLs.
 	DisplayName string `json:"displayName"`
+	// URL to a box art image.
+	// The image dimensions are specifiable via the `height` and `width` parameters.
+	//
+	// If `height` or `width` are not specified, the URL will contain
+	// the template strings `{height}` and/or `{width}` in their respective places.
+	BoxArtURL string `json:"boxArtURL"`
 }
 
 // GetId returns UserInfoLastBroadcastGame.Id, and is useful for accessing the field via an interface.
@@ -808,6 +859,9 @@ func (v *UserInfoLastBroadcastGame) GetName() string { return v.Name }
 
 // GetDisplayName returns UserInfoLastBroadcastGame.DisplayName, and is useful for accessing the field via an interface.
 func (v *UserInfoLastBroadcastGame) GetDisplayName() string { return v.DisplayName }
+
+// GetBoxArtURL returns UserInfoLastBroadcastGame.BoxArtURL, and is useful for accessing the field via an interface.
+func (v *UserInfoLastBroadcastGame) GetBoxArtURL() string { return v.BoxArtURL }
 
 // UserInfoSubscriptionProductsSubscriptionProduct includes the requested fields of the GraphQL type SubscriptionProduct.
 // The GraphQL type's documentation follows.
@@ -1007,6 +1061,12 @@ type UserInfoVideosVideoConnectionEdgesVideoEdgeNodeVideoGame struct {
 	// This field should only be used in limited occassions, like tracking and URLs.
 	// You should use displayName for all all game names shown to the users.
 	Name string `json:"name"`
+	// URL to a box art image.
+	// The image dimensions are specifiable via the `height` and `width` parameters.
+	//
+	// If `height` or `width` are not specified, the URL will contain
+	// the template strings `{height}` and/or `{width}` in their respective places.
+	BoxArtURL string `json:"boxArtURL"`
 }
 
 // GetId returns UserInfoVideosVideoConnectionEdgesVideoEdgeNodeVideoGame.Id, and is useful for accessing the field via an interface.
@@ -1014,6 +1074,11 @@ func (v *UserInfoVideosVideoConnectionEdgesVideoEdgeNodeVideoGame) GetId() strin
 
 // GetName returns UserInfoVideosVideoConnectionEdgesVideoEdgeNodeVideoGame.Name, and is useful for accessing the field via an interface.
 func (v *UserInfoVideosVideoConnectionEdgesVideoEdgeNodeVideoGame) GetName() string { return v.Name }
+
+// GetBoxArtURL returns UserInfoVideosVideoConnectionEdgesVideoEdgeNodeVideoGame.BoxArtURL, and is useful for accessing the field via an interface.
+func (v *UserInfoVideosVideoConnectionEdgesVideoEdgeNodeVideoGame) GetBoxArtURL() string {
+	return v.BoxArtURL
+}
 
 type VideoPrivacyScope string
 
@@ -1104,6 +1169,7 @@ query GetStreams ($first: Int!, $cursor: Cursor!) {
 				broadcaster {
 					id
 					login
+					profileImageURL(width: 50)
 					broadcastSettings {
 						isMature
 						language
@@ -1113,6 +1179,7 @@ query GetStreams ($first: Int!, $cursor: Cursor!) {
 				game {
 					name
 					id
+					boxArtURL(width: 40, height: 56)
 				}
 				viewersCount
 				createdAt
@@ -1165,6 +1232,7 @@ query GetThreeUsers ($user1: String!, $user2: String!, $user3: String!) {
 fragment UserInfo on User {
 	login
 	id
+	profileImageURL(width: 50)
 	lastBroadcast {
 		id
 		startedAt
@@ -1172,6 +1240,7 @@ fragment UserInfo on User {
 			id
 			name
 			displayName
+			boxArtURL(width: 40, height: 56)
 		}
 	}
 	broadcastSettings {
@@ -1193,6 +1262,7 @@ fragment UserInfo on User {
 				game {
 					id
 					name
+					boxArtURL(width: 40, height: 56)
 				}
 				seekPreviewsURL
 				broadcastType
