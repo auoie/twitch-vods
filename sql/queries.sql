@@ -21,7 +21,7 @@ ORDER BY
   start_time DESC
 LIMIT 1)
 SELECT
-  id, max_views, start_time, s.streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start, is_mature_at_start, game_id_at_start, bytes_found, public, sub_only, hls_duration_seconds
+  id, max_views, start_time, s.streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start, is_mature_at_start, game_id_at_start, bytes_found, public, sub_only, hls_duration_seconds, box_art_url_at_start, profile_image_url_at_start
 FROM
   streams s
 INNER JOIN
@@ -94,7 +94,7 @@ WHERE
 
 -- name: GetPopularLiveStreams :many
 SELECT
-  id, max_views, start_time, streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start, is_mature_at_start, game_id_at_start, bytes_found, public, sub_only, hls_duration_seconds
+  id, max_views, start_time, streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start, is_mature_at_start, game_id_at_start, bytes_found, public, sub_only, hls_duration_seconds, box_art_url_at_start, profile_image_url_at_start
 FROM
   streams
 WHERE
@@ -105,7 +105,7 @@ LIMIT $3;
 
 -- name: GetPopularLiveStreamsByLanguage :many
 SELECT
-  id, max_views, start_time, streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start, is_mature_at_start, game_id_at_start, bytes_found, public, sub_only, hls_duration_seconds
+  id, max_views, start_time, streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start, is_mature_at_start, game_id_at_start, bytes_found, public, sub_only, hls_duration_seconds, box_art_url_at_start, profile_image_url_at_start
 FROM
   streams
 WHERE
@@ -116,7 +116,7 @@ LIMIT $4;
 
 -- name: GetPopularLiveStreamsByGameId :many
 SELECT
-  id, max_views, start_time, streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start, is_mature_at_start, game_id_at_start, bytes_found, public, sub_only, hls_duration_seconds
+  id, max_views, start_time, streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start, is_mature_at_start, game_id_at_start, bytes_found, public, sub_only, hls_duration_seconds, box_art_url_at_start, profile_image_url_at_start
 FROM
   streams
 WHERE

@@ -191,7 +191,7 @@ ORDER BY
   start_time DESC
 LIMIT 1)
 SELECT
-  id, max_views, start_time, s.streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start, is_mature_at_start, game_id_at_start, bytes_found, public, sub_only, hls_duration_seconds
+  id, max_views, start_time, s.streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start, is_mature_at_start, game_id_at_start, bytes_found, public, sub_only, hls_duration_seconds, box_art_url_at_start, profile_image_url_at_start
 FROM
   streams s
 INNER JOIN
@@ -209,21 +209,23 @@ type GetLatestStreamsFromStreamerLoginParams struct {
 }
 
 type GetLatestStreamsFromStreamerLoginRow struct {
-	ID                   uuid.UUID
-	MaxViews             int64
-	StartTime            time.Time
-	StreamerID           string
-	StreamID             string
-	StreamerLoginAtStart string
-	GameNameAtStart      string
-	LanguageAtStart      string
-	TitleAtStart         string
-	IsMatureAtStart      bool
-	GameIDAtStart        string
-	BytesFound           sql.NullBool
-	Public               sql.NullBool
-	SubOnly              sql.NullBool
-	HlsDurationSeconds   sql.NullFloat64
+	ID                     uuid.UUID
+	MaxViews               int64
+	StartTime              time.Time
+	StreamerID             string
+	StreamID               string
+	StreamerLoginAtStart   string
+	GameNameAtStart        string
+	LanguageAtStart        string
+	TitleAtStart           string
+	IsMatureAtStart        bool
+	GameIDAtStart          string
+	BytesFound             sql.NullBool
+	Public                 sql.NullBool
+	SubOnly                sql.NullBool
+	HlsDurationSeconds     sql.NullFloat64
+	BoxArtUrlAtStart       string
+	ProfileImageUrlAtStart string
 }
 
 func (q *Queries) GetLatestStreamsFromStreamerLogin(ctx context.Context, arg GetLatestStreamsFromStreamerLoginParams) ([]*GetLatestStreamsFromStreamerLoginRow, error) {
@@ -251,6 +253,8 @@ func (q *Queries) GetLatestStreamsFromStreamerLogin(ctx context.Context, arg Get
 			&i.Public,
 			&i.SubOnly,
 			&i.HlsDurationSeconds,
+			&i.BoxArtUrlAtStart,
+			&i.ProfileImageUrlAtStart,
 		); err != nil {
 			return nil, err
 		}
@@ -264,7 +268,7 @@ func (q *Queries) GetLatestStreamsFromStreamerLogin(ctx context.Context, arg Get
 
 const getPopularLiveStreams = `-- name: GetPopularLiveStreams :many
 SELECT
-  id, max_views, start_time, streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start, is_mature_at_start, game_id_at_start, bytes_found, public, sub_only, hls_duration_seconds
+  id, max_views, start_time, streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start, is_mature_at_start, game_id_at_start, bytes_found, public, sub_only, hls_duration_seconds, box_art_url_at_start, profile_image_url_at_start
 FROM
   streams
 WHERE
@@ -281,21 +285,23 @@ type GetPopularLiveStreamsParams struct {
 }
 
 type GetPopularLiveStreamsRow struct {
-	ID                   uuid.UUID
-	MaxViews             int64
-	StartTime            time.Time
-	StreamerID           string
-	StreamID             string
-	StreamerLoginAtStart string
-	GameNameAtStart      string
-	LanguageAtStart      string
-	TitleAtStart         string
-	IsMatureAtStart      bool
-	GameIDAtStart        string
-	BytesFound           sql.NullBool
-	Public               sql.NullBool
-	SubOnly              sql.NullBool
-	HlsDurationSeconds   sql.NullFloat64
+	ID                     uuid.UUID
+	MaxViews               int64
+	StartTime              time.Time
+	StreamerID             string
+	StreamID               string
+	StreamerLoginAtStart   string
+	GameNameAtStart        string
+	LanguageAtStart        string
+	TitleAtStart           string
+	IsMatureAtStart        bool
+	GameIDAtStart          string
+	BytesFound             sql.NullBool
+	Public                 sql.NullBool
+	SubOnly                sql.NullBool
+	HlsDurationSeconds     sql.NullFloat64
+	BoxArtUrlAtStart       string
+	ProfileImageUrlAtStart string
 }
 
 func (q *Queries) GetPopularLiveStreams(ctx context.Context, arg GetPopularLiveStreamsParams) ([]*GetPopularLiveStreamsRow, error) {
@@ -323,6 +329,8 @@ func (q *Queries) GetPopularLiveStreams(ctx context.Context, arg GetPopularLiveS
 			&i.Public,
 			&i.SubOnly,
 			&i.HlsDurationSeconds,
+			&i.BoxArtUrlAtStart,
+			&i.ProfileImageUrlAtStart,
 		); err != nil {
 			return nil, err
 		}
@@ -336,7 +344,7 @@ func (q *Queries) GetPopularLiveStreams(ctx context.Context, arg GetPopularLiveS
 
 const getPopularLiveStreamsByGameId = `-- name: GetPopularLiveStreamsByGameId :many
 SELECT
-  id, max_views, start_time, streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start, is_mature_at_start, game_id_at_start, bytes_found, public, sub_only, hls_duration_seconds
+  id, max_views, start_time, streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start, is_mature_at_start, game_id_at_start, bytes_found, public, sub_only, hls_duration_seconds, box_art_url_at_start, profile_image_url_at_start
 FROM
   streams
 WHERE
@@ -354,21 +362,23 @@ type GetPopularLiveStreamsByGameIdParams struct {
 }
 
 type GetPopularLiveStreamsByGameIdRow struct {
-	ID                   uuid.UUID
-	MaxViews             int64
-	StartTime            time.Time
-	StreamerID           string
-	StreamID             string
-	StreamerLoginAtStart string
-	GameNameAtStart      string
-	LanguageAtStart      string
-	TitleAtStart         string
-	IsMatureAtStart      bool
-	GameIDAtStart        string
-	BytesFound           sql.NullBool
-	Public               sql.NullBool
-	SubOnly              sql.NullBool
-	HlsDurationSeconds   sql.NullFloat64
+	ID                     uuid.UUID
+	MaxViews               int64
+	StartTime              time.Time
+	StreamerID             string
+	StreamID               string
+	StreamerLoginAtStart   string
+	GameNameAtStart        string
+	LanguageAtStart        string
+	TitleAtStart           string
+	IsMatureAtStart        bool
+	GameIDAtStart          string
+	BytesFound             sql.NullBool
+	Public                 sql.NullBool
+	SubOnly                sql.NullBool
+	HlsDurationSeconds     sql.NullFloat64
+	BoxArtUrlAtStart       string
+	ProfileImageUrlAtStart string
 }
 
 func (q *Queries) GetPopularLiveStreamsByGameId(ctx context.Context, arg GetPopularLiveStreamsByGameIdParams) ([]*GetPopularLiveStreamsByGameIdRow, error) {
@@ -401,6 +411,8 @@ func (q *Queries) GetPopularLiveStreamsByGameId(ctx context.Context, arg GetPopu
 			&i.Public,
 			&i.SubOnly,
 			&i.HlsDurationSeconds,
+			&i.BoxArtUrlAtStart,
+			&i.ProfileImageUrlAtStart,
 		); err != nil {
 			return nil, err
 		}
@@ -414,7 +426,7 @@ func (q *Queries) GetPopularLiveStreamsByGameId(ctx context.Context, arg GetPopu
 
 const getPopularLiveStreamsByLanguage = `-- name: GetPopularLiveStreamsByLanguage :many
 SELECT
-  id, max_views, start_time, streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start, is_mature_at_start, game_id_at_start, bytes_found, public, sub_only, hls_duration_seconds
+  id, max_views, start_time, streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start, is_mature_at_start, game_id_at_start, bytes_found, public, sub_only, hls_duration_seconds, box_art_url_at_start, profile_image_url_at_start
 FROM
   streams
 WHERE
@@ -432,21 +444,23 @@ type GetPopularLiveStreamsByLanguageParams struct {
 }
 
 type GetPopularLiveStreamsByLanguageRow struct {
-	ID                   uuid.UUID
-	MaxViews             int64
-	StartTime            time.Time
-	StreamerID           string
-	StreamID             string
-	StreamerLoginAtStart string
-	GameNameAtStart      string
-	LanguageAtStart      string
-	TitleAtStart         string
-	IsMatureAtStart      bool
-	GameIDAtStart        string
-	BytesFound           sql.NullBool
-	Public               sql.NullBool
-	SubOnly              sql.NullBool
-	HlsDurationSeconds   sql.NullFloat64
+	ID                     uuid.UUID
+	MaxViews               int64
+	StartTime              time.Time
+	StreamerID             string
+	StreamID               string
+	StreamerLoginAtStart   string
+	GameNameAtStart        string
+	LanguageAtStart        string
+	TitleAtStart           string
+	IsMatureAtStart        bool
+	GameIDAtStart          string
+	BytesFound             sql.NullBool
+	Public                 sql.NullBool
+	SubOnly                sql.NullBool
+	HlsDurationSeconds     sql.NullFloat64
+	BoxArtUrlAtStart       string
+	ProfileImageUrlAtStart string
 }
 
 func (q *Queries) GetPopularLiveStreamsByLanguage(ctx context.Context, arg GetPopularLiveStreamsByLanguageParams) ([]*GetPopularLiveStreamsByLanguageRow, error) {
@@ -479,6 +493,8 @@ func (q *Queries) GetPopularLiveStreamsByLanguage(ctx context.Context, arg GetPo
 			&i.Public,
 			&i.SubOnly,
 			&i.HlsDurationSeconds,
+			&i.BoxArtUrlAtStart,
+			&i.ProfileImageUrlAtStart,
 		); err != nil {
 			return nil, err
 		}
