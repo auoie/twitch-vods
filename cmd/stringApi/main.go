@@ -16,10 +16,12 @@ import (
 	"github.com/julienschmidt/httprouter"
 )
 
-func addCors(f httprouter.Handle) httprouter.Handle {
-	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3001")
-		f(w, r, p)
+func makeAddCorsMiddleare(clientUrl string) func(httprouter.Handle) httprouter.Handle {
+	return func(f httprouter.Handle) httprouter.Handle {
+		return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+			w.Header().Set("Access-Control-Allow-Origin", clientUrl)
+			f(w, r, p)
+		}
 	}
 }
 
@@ -215,6 +217,11 @@ func main() {
 	if !ok {
 		databaseUrl = "postgresql://govods:password@localhost:5432/twitch"
 	}
+	clientUrl, ok := os.LookupEnv("CLIENT_URL")
+	if !ok {
+		log.Fatal("CLIENT_URL is missing for CORS")
+	}
+	addCors := makeAddCorsMiddleare(clientUrl)
 	ctx := context.Background()
 	conn, err := pgxpool.Connect(ctx, databaseUrl)
 	if err != nil {
