@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -15,6 +16,15 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/julienschmidt/httprouter"
 )
+
+var ErrParse = errors.New("must contain @")
+
+func parseParam(param string) (string, error) {
+	if len(param) == 0 || param[0] != '@' {
+		return "", ErrParse
+	}
+	return param[1:], nil
+}
 
 func makeAddCorsMiddleare(clientUrl string) func(httprouter.Handle) httprouter.Handle {
 	return func(f httprouter.Handle) httprouter.Handle {
@@ -65,8 +75,13 @@ func makeMostViewedHandler(ctx context.Context, queries *sqlvods.Queries) httpro
 
 func makeAllLanguageHandler(ctx context.Context, queries *sqlvods.Queries) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+		language, err := parseParam(p.ByName("language"))
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
 		results, err := queries.GetPopularLiveStreamsByLanguage(ctx, sqlvods.GetPopularLiveStreamsByLanguageParams{
-			LanguageAtStart: p.ByName("language"),
+			LanguageAtStart: language,
 			Public:          sql.NullBool{Bool: p.ByName("pub-status") == "public", Valid: true},
 			SubOnly:         sql.NullBool{Bool: p.ByName("sub-status") == "sub", Valid: true},
 			Limit:           100,
@@ -100,8 +115,13 @@ func makeAllLanguageHandler(ctx context.Context, queries *sqlvods.Queries) httpr
 
 func makeAllCategoryHandler(ctx context.Context, queries *sqlvods.Queries) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+		categoryId, err := parseParam(p.ByName("game-id"))
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
 		results, err := queries.GetPopularLiveStreamsByGameId(ctx, sqlvods.GetPopularLiveStreamsByGameIdParams{
-			GameIDAtStart: p.ByName("game-id"),
+			GameIDAtStart: categoryId,
 			Public:        sql.NullBool{Bool: p.ByName("pub-status") == "public", Valid: true},
 			SubOnly:       sql.NullBool{Bool: p.ByName("sub-status") == "sub", Valid: true},
 			Limit:         100,
@@ -135,8 +155,8 @@ func makeAllCategoryHandler(ctx context.Context, queries *sqlvods.Queries) httpr
 
 func makeStreamerHandler(ctx context.Context, queries *sqlvods.Queries) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-		name := p.ByName("streamer")
-		if name == "" {
+		name, err := parseParam(p.ByName("streamer"))
+		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
