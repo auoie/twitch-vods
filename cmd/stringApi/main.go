@@ -44,7 +44,7 @@ func makeMostViewedHandler(ctx context.Context, queries *sqlvods.Queries) httpro
 		results, err := queries.GetPopularLiveStreams(ctx, sqlvods.GetPopularLiveStreamsParams{
 			Public:  sql.NullBool{Bool: p.ByName("pub-status") == "public", Valid: true},
 			SubOnly: sql.NullBool{Bool: p.ByName("sub-status") == "sub", Valid: true},
-			Limit:   100,
+			Limit:   50,
 		})
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -84,7 +84,7 @@ func makeAllLanguageHandler(ctx context.Context, queries *sqlvods.Queries) httpr
 			LanguageAtStart: language,
 			Public:          sql.NullBool{Bool: p.ByName("pub-status") == "public", Valid: true},
 			SubOnly:         sql.NullBool{Bool: p.ByName("sub-status") == "sub", Valid: true},
-			Limit:           100,
+			Limit:           50,
 		})
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -124,7 +124,7 @@ func makeAllCategoryHandler(ctx context.Context, queries *sqlvods.Queries) httpr
 			GameIDAtStart: categoryId,
 			Public:        sql.NullBool{Bool: p.ByName("pub-status") == "public", Valid: true},
 			SubOnly:       sql.NullBool{Bool: p.ByName("sub-status") == "sub", Valid: true},
-			Limit:         100,
+			Limit:         50,
 		})
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -160,7 +160,7 @@ func makeStreamerHandler(ctx context.Context, queries *sqlvods.Queries) httprout
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		streams, err := queries.GetLatestStreamsFromStreamerLogin(ctx, sqlvods.GetLatestStreamsFromStreamerLoginParams{StreamerLoginAtStart: name, Limit: 100})
+		streams, err := queries.GetLatestStreamsFromStreamerLogin(ctx, sqlvods.GetLatestStreamsFromStreamerLoginParams{StreamerLoginAtStart: name, Limit: 50})
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
