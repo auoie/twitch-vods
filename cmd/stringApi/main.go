@@ -235,7 +235,7 @@ type TStreamResult struct {
 func main() {
 	databaseUrl, ok := os.LookupEnv("DATABASE_URL")
 	if !ok {
-		databaseUrl = "postgresql://govods:password@localhost:5432/twitch"
+		log.Fatal("DATABASE_URL is missing for db connection string")
 	}
 	clientUrl, ok := os.LookupEnv("CLIENT_URL")
 	if !ok {
