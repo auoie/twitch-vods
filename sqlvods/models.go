@@ -25,8 +25,6 @@ type Stream struct {
 	GameIDAtStart                    string
 	IsMatureAtStart                  bool
 	LastUpdatedMinusStartTimeSeconds float64
-	BoxArtUrlAtStart                 string
-	ProfileImageUrlAtStart           string
 	RecordingFetchedAt               sql.NullTime
 	GzippedBytes                     []byte
 	HlsDomain                        sql.NullString
@@ -35,4 +33,6 @@ type Stream struct {
 	Public                           sql.NullBool
 	SubOnly                          sql.NullBool
 	SeekPreviewsDomain               sql.NullString
+	BoxArtUrlAtStart                 string
+	ProfileImageUrlAtStart           string
 }

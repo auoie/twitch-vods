@@ -35,7 +35,7 @@ func (q *Queries) DeleteStreams(ctx context.Context) error {
 
 const getEverything = `-- name: GetEverything :many
 SELECT
-  id, streamer_id, stream_id, start_time, max_views, last_updated_at, streamer_login_at_start, language_at_start, title_at_start, game_name_at_start, game_id_at_start, is_mature_at_start, last_updated_minus_start_time_seconds, box_art_url_at_start, profile_image_url_at_start, recording_fetched_at, gzipped_bytes, hls_domain, hls_duration_seconds, bytes_found, public, sub_only, seek_previews_domain
+  id, streamer_id, stream_id, start_time, max_views, last_updated_at, streamer_login_at_start, language_at_start, title_at_start, game_name_at_start, game_id_at_start, is_mature_at_start, last_updated_minus_start_time_seconds, recording_fetched_at, gzipped_bytes, hls_domain, hls_duration_seconds, bytes_found, public, sub_only, seek_previews_domain, box_art_url_at_start, profile_image_url_at_start
 FROM
   streams s
 `
@@ -63,8 +63,6 @@ func (q *Queries) GetEverything(ctx context.Context) ([]*Stream, error) {
 			&i.GameIDAtStart,
 			&i.IsMatureAtStart,
 			&i.LastUpdatedMinusStartTimeSeconds,
-			&i.BoxArtUrlAtStart,
-			&i.ProfileImageUrlAtStart,
 			&i.RecordingFetchedAt,
 			&i.GzippedBytes,
 			&i.HlsDomain,
@@ -73,6 +71,8 @@ func (q *Queries) GetEverything(ctx context.Context) ([]*Stream, error) {
 			&i.Public,
 			&i.SubOnly,
 			&i.SeekPreviewsDomain,
+			&i.BoxArtUrlAtStart,
+			&i.ProfileImageUrlAtStart,
 		); err != nil {
 			return nil, err
 		}
