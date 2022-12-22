@@ -1,8 +1,8 @@
 version: "2"
 sql:
   - engine: "postgresql"
-    queries: "sql/queries.sql"
-    schema: "sql/schema.sql"
+    queries: "sqlc/queries.sql"
+    schema: "sqlc/migrations"
     gen:
       go:
         package: "sqlvods"
