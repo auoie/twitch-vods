@@ -1,0 +1,8 @@
+/.vscode/
+/docker/
+/sqlc/
+*.md
+*.yml
+*.yaml
+*.prisma
+LICENSE
