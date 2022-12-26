@@ -36,7 +36,10 @@ func makeAddCorsMiddleare(clientUrl string) func(httprouter.Handle) httprouter.H
 }
 
 func okHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-	w.WriteHeader(http.StatusOK)
+}
+
+func bongHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	w.Write([]byte("bong"))
 }
 
 func makeMostViewedHandler(ctx context.Context, queries *sqlvods.Queries) httprouter.Handle {
@@ -260,10 +263,12 @@ func main() {
 	// pub-status: either public or private
 	// sub-status: either sub or free
 	router.GET("/", addCors(okHandler))
+	router.GET("/bing", addCors(bongHandler))
 	router.GET("/all/:pub-status/:sub-status", addCors(makeMostViewedHandler(ctx, queries)))
 	router.GET("/channels/:streamer", addCors(makeStreamerHandler(ctx, queries)))
-	router.GET("/m3u8/:streamid/:unix/index.m3u8", addCors(makeM3U8Handler(ctx, queries)))
+	router.GET("/m3u8/:streamid/:unix/index.m3u8", makeM3U8Handler(ctx, queries))
 	router.GET("/language/:language/all/:pub-status/:sub-status", addCors(makeAllLanguageHandler(ctx, queries)))
 	router.GET("/category/:game-id/all/:pub-status/:sub-status", addCors(makeAllCategoryHandler(ctx, queries)))
+	fmt.Println("Serving on port :3000")
 	http.ListenAndServe(":3000", router)
 }

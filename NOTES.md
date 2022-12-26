@@ -428,7 +428,6 @@ SELECT COUNT(*) FROM streams WHERE public = True AND last_updated_at BETWEEN NOW
 - https://d3c27h4odz752x.cloudfront.net/. Nothing.
 - https://ddacn6pr5v0tl.cloudfront.net/. Nothing.
 - https://d3aqoihi2n8ty8.cloudfront.net/. Returns an XML file with the following metadata.
-
   ```xml
   <Name>bits-assets</Name>
   <Prefix/>
@@ -481,7 +480,7 @@ npx prisma migrate diff --from-migrations sqlc/migrations --to-schema-datamodel 
 `pgcli` seems to be buggy. See [here](https://github.com/dbcli/pgcli/issues/1117).
 In particular, it doesn't understand `--` when trying to create the `"streams"` table.
 
-## Docker
+## Docker for Development
 
 See [here](https://7thzero.com/blog/golang-w-sqlite3-docker-scratch-image) and [here](https://gist.github.com/zmb3/2bf29397633c9c9cc5125fdaa988c8a8)
 for making statically linked Go binaries that include C dependencies.
@@ -489,38 +488,88 @@ for making statically linked Go binaries that include C dependencies.
 ```bash
 docker build -f ./docker/stringApi/Dockerfile -t twitch-vods-string-api:latest . --progress plain
 docker build -f ./docker/scraper/Dockerfile -t twitch-vods-scraper:latest . --progress plain
+```
 
+Then we can create the containers.
+To get the IP of a docker container from the host, see [here](https://stackoverflow.com/questions/17157721/how-to-get-a-docker-containers-ip-address-from-the-host).
+
+```bash
 # set PASSWORD env variable
-POSTGRES_DB="postgresql://twitch-vods-admin:$PASSWORD@twitch-vods-db:5432/twitch-vods"
+source ./.env
+DOCKER_POSTGRES_DB="postgresql://twitch-vods-admin:$PASSWORD@twitch-vods-db:5432/twitch-vods"
 mkdir -p ~/docker/twitch-vods/twitch-vods-db
-mkdir -p ~/docker/twitch-vods/twitch-vods-debugging
 docker network create twitch-vods-network
 docker run -d --restart always \
   --name twitch-vods-db \
   -e POSTGRES_USER="twitch-vods-admin" \
   -e POSTGRES_PASSWORD=$PASSWORD \
   -e POSTGRES_DB="twitch-vods" \
-  -v ~/docker/twitch-vods/twitch-vods-db:/var/lib/postgresql/data \
+  -v ~/docker/twitch-vods/twitch-vods-db/data:/var/lib/postgresql/data \
+  -v ~/docker/twitch-vods/twitch-vods-db/app:/home/app \
   --network twitch-vods-network \
-  postgres
-docker run -d --restart always \
-  --name twitch-vods-scraper \
-  -e DATABASE_URL=$POSTGRES_DB \
-  --network twitch-vods-network \
-  twitch-vods-scraper
+  postgres:15
+POSTGRES_DB="postgresql://twitch-vods-admin:$PASSWORD@$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' twitch-vods-db):5432/twitch-vods?sslmode=disable"
+migrate -source file://sqlc/migrations -database $POSTGRES_DB up
+
+# before running the stateless stuff below, migrate the data from the previous database
 docker run -d --restart always \
   --name twitch-vods-string-api \
-  -e DATABASE_URL=$POSTGRES_DB \
+  -e DATABASE_URL=$DOCKER_POSTGRES_DB \
   -e CLIENT_URL="*" \
+  -p 3000:3000 \
   --network twitch-vods-network \
   twitch-vods-string-api
-docker run -d -t --restart always \
-  --name twitch-vods-debugging \
+docker run -d --restart always \
+  --name twitch-vods-scraper \
+  -e DATABASE_URL=$DOCKER_POSTGRES_DB \
   --network twitch-vods-network \
-  -v ~/docker/twitch-vods/twitch-vods-debugging:/home/app/twitch-vods \
-  ubuntu
+  twitch-vods-scraper
+```
 
-docker exec -it twitch-vods-debugging /bin/bash
+## Migrating from Old Docker to New Docker
+
+I have a docker container called `sensitive_data` on my default bridge network with the port mapping `-p 5432:5432`.
+I want to migrate it to my `twitch-vods-network` bridge network.
+
+First, we configure a docker container on the default bridge network and bind its contents to the host.
+I need to user a debugger container because I need to use `pg_dump` for Postgres 15, and the version installed on my system is for Postgres 14.
+
+[This answer](https://stackoverflow.com/a/59307721) basically shows how to create a backup with `pg_dump` that is compatible with `pg_restore`.
+Basically, you have to use `--format=custom` which is the same as `-F c`.
+Then you can restore it with `pg_restore`.
+By default, it uses GZIP compression.
+In Postgres 16, it will get ZSTD compression.
+There are some notes [here](https://stackoverflow.com/questions/15692508/a-faster-way-to-copy-a-postgresql-database-or-the-best-way) on how to make this faster.
+For absolute speed, it's probably better to set `-Z0` and then `rsync` with `--compress-choice=zstd --compress-level=3 --checksum-choice=xxh3`.
+See [here](https://news.ycombinator.com/item?id=26371810) for those `rsync` options.
+This takes more storage space.
+
+```bash
+# From the host
+mkdir -p ~/docker/twitch-vods/twitch-vods-db-debugger
+docker run --rm \
+  -e POSTGRES_PASSWORD=password \
+  --name twitch-vods-db-debugger \
+  -v ~/docker/twitch-vods/twitch-vods-db-debugger/data:/var/lib/postgresql/data \
+  -v ~/docker/twitch-vods/twitch-vods-db-debugger/app:/home/app \
+  postgres:15
+docker exec -it twitch-vods-db-debugger /bin/bash
+
+# Now in the twitch-vods-db-debugger
+apt-get update && apt-get -y upgrade && apt-get -y install curl iproute2 net-tools
+route # 172.17.0.1
+pg_dump --format=custom --file /home/app/backup.dump postgresql://govods:password@172.17.0.1:5432/twitch
+
+# Back in the host
+sudo mv ~/docker/twitch-vods/twitch-vods-db-debugger/app/backup.dump ~/docker/twitch-vods/twitch-vods-db/app
+docker stop twitch-vods-db-debugger
+sudo rm -rf ~/docker/twitch-vods/twitch-vods-db-debugger/
+docker exec -it twitch-vods-db /bin/bash
+
+## Now in the twitch-vods-db
+# set PASSWORD
+DOCKER_POSTGRES_DB="postgresql://twitch-vods-admin:$PASSWORD@localhost:5432/twitch-vods"
+pg_restore --verbose --clean --no-owner --dbname $DOCKER_POSTGRES_DB /home/app/backup.dump
 ```
 
 ## TODO
