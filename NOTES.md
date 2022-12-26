@@ -485,6 +485,8 @@ In particular, it doesn't understand `--` when trying to create the `"streams"` 
 See [here](https://7thzero.com/blog/golang-w-sqlite3-docker-scratch-image) and [here](https://gist.github.com/zmb3/2bf29397633c9c9cc5125fdaa988c8a8)
 for making statically linked Go binaries that include C dependencies.
 
+To make building faster, use the [build cache](https://www.reddit.com/r/golang/comments/q7zppz/docker_cache_for_dependencies/) feature.
+
 ```bash
 docker build -f ./docker/stringApi/Dockerfile -t twitch-vods-string-api:latest . --progress plain
 docker build -f ./docker/scraper/Dockerfile -t twitch-vods-scraper:latest . --progress plain
