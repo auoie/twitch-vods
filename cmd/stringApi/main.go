@@ -246,15 +246,20 @@ func main() {
 	}
 	addCors := makeAddCorsMiddleare(clientUrl)
 	ctx := context.Background()
-	conn, err := pgxpool.Connect(ctx, databaseUrl)
+	config, err := pgxpool.ParseConfig(os.Getenv("DATABASE_URL"))
+	if err != nil {
+		log.Println(fmt.Sprint("DATABASE_URL ", databaseUrl, " was not parseable"))
+		log.Fatal(err)
+	}
+	conn, err := pgxpool.ConnectConfig(ctx, config)
 	if err != nil {
 		log.Println(fmt.Sprint("failed to connect to ", databaseUrl, ": ", err))
 		log.Fatal(err)
 	}
+	defer conn.Close()
 	err = conn.Ping(ctx)
 	if err != nil {
 		log.Println(fmt.Sprint("failed to ping ", databaseUrl, ": ", err))
-		conn.Close()
 		log.Fatal(err)
 	}
 	queries := sqlvods.New(conn)

@@ -477,7 +477,7 @@ npx prisma migrate diff --from-url postgresql://user:password@localhost:8889/db 
 npx prisma migrate diff --from-migrations sqlc/migrations --to-schema-datamodel ./schema.prisma --shadow-database-url postgresql://user:password@localhost:8888/db --script
 ```
 
-`pgcli` seems to be buggy. See [here](https://github.com/dbcli/pgcli/issues/1117).
+`pgcli` seems to be buggy. See [here](https://github.com/dbcli/pgcli/issues/1377).
 In particular, it doesn't understand `--` when trying to create the `"streams"` table.
 
 ## Docker for Development
@@ -574,8 +574,38 @@ DOCKER_POSTGRES_DB="postgresql://twitch-vods-admin:$PASSWORD@localhost:5432/twit
 pg_restore --verbose --clean --no-owner --dbname $DOCKER_POSTGRES_DB /home/app/backup.dump
 ```
 
+## Benchmarking
+
+I used to use `ab` for load testing. I tried out `wrk`, but it seems to suffer from coordinated omission.
+See [here](https://news.ycombinator.com/item?id=10486215) for a definition.
+Instead, use something like `wrk2` or `vegeta` which make requests at a fixed rate.
+Further discussion is [here](https://lobste.rs/s/mqxwuc/what_s_your_preferred_tool_for_load).
+
+```bash
+echo "GET http://localhost:3000/all/private/sub" | vegeta attack -duration 1000ms -rate 40000 | vegeta report --type=text
+```
+
+If the duration is set too high, `vegeta` will open too many ports and get an error message.
+Recall that a connection mathematically is a tuple `(server_ip, server_port, client_ip, client_port)`.
+In Linux, there are `64K` ports, but practically it's more like `40K`.
+So when running on a single machine, the value `duration * rate` should be at most `40000`.
+See an approximation of the number of connections with `netstat -atn | wc -l`.
+
+```text
+Get "http://localhost:3000/all/private/sub": dial tcp 0.0.0.0:0->[::1]:3000: bind: address already in use
+```
+
+View the CPU and memory usage of each docker container with `docker stats`.
+The memory usage of `twitch-vods-string-api` after being load tested is really high.
+Right now it's around 782 MiB, which is more than the Postgres database at 680 MiB.
+I think this is because of `pgx`. See [this issue](https://github.com/jackc/pgx/issues/1127) and [this issue](https://github.com/jackc/pgx/issues/845).
+It seems to have been [resolved](https://github.com/jackc/pgx/blob/master/CHANGELOG.md#reduced-memory-usage-by-reusing-read-buffers) in `pgx v5`.
+
 ## TODO
 
+- `pgx v4` uses too much memory. Migrate to `pgx v5`.
+  `sqlc v16` is not compatible with `pgx v5`.
+  Support has been merged into the main branch. I should build `sqlc` from source and set it to generate `pgx v5` code.
 - Try to avoid the cloudfront rate limit by making a custom govods in here to make fewer requests
   - round robin, but if a url is successful, use that as the url of the next stream to start
   - reduce the number of fetchers from 3 to 2
