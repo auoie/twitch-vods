@@ -574,6 +574,35 @@ DOCKER_POSTGRES_DB="postgresql://twitch-vods-admin:$PASSWORD@localhost:5432/twit
 pg_restore --verbose --clean --no-owner --dbname $DOCKER_POSTGRES_DB /home/app/backup.dump
 ```
 
+## Copying to Remote
+
+For debugging:
+
+```bash
+# in the host
+mkdir -p ~/docker/twitch-vods/twitch-vods-debugger
+source .env
+docker run --rm -it \
+  --name twitch-vods-debugger \
+  -v ~/docker/twitch-vods/twitch-vods-debugger/app:/home/app \
+  -e POSTGRES_PASSWORD=password \
+  -e DATABASE_URL=$DOCKER_POSTGRES_DB \
+  --network twitch-vods-network \
+  postgres:15
+docker exec -it twitch-vods-debugger /bin/bash
+
+# in the container
+pg_dump -Z0 -Fc -f /home/app/backup.dump $DATABASE_URL
+
+# in the host
+rsync -avzhP \
+  --compress-choice=zstd \
+  --compress-level=1 \
+  --checksum-choice=xxh3 \
+  --rsync-path $RSYNC_PATH \
+  ~/docker/twitch-vods/twitch-vods-debugger/app/backup.dump $REMOTE_USER:docker/backup.dump
+```
+
 ## Benchmarking
 
 I used to use `ab` for load testing. I tried out `wrk`, but it seems to suffer from coordinated omission.
