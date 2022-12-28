@@ -372,14 +372,23 @@ type vodCompressedBytesResult struct {
 func getVodCompressedBytes(ctx context.Context, videoData *vods.VideoData, compressor *libdeflate.Compressor) (*vodCompressedBytesResult, error) {
 	dwp, err := getFirstValidDwpResponse(ctx, videoData)
 	if err != nil {
+		log.Println(fmt.Sprint("minus 0 error: ", err))
+	}
+	if err != nil {
 		dwp, err = getFirstValidDwpResponse(ctx, &vods.VideoData{
 			StreamerName: videoData.StreamerName,
 			VideoId:      videoData.VideoId,
 			Time:         videoData.Time.Add(-time.Second),
 		})
+		if err != nil {
+			log.Println(fmt.Sprint("minus 1 error: ", err))
+		}
 		if err == nil {
 			log.Println("subtracted 1 second got result: ", *videoData)
 		}
+	}
+	if ctx.Err() == context.DeadlineExceeded {
+		log.Println(fmt.Sprint(context.DeadlineExceeded, ": fetching dwp response"))
 	}
 	if err != nil {
 		log.Println(fmt.Sprint("Link was not found for ", videoData.StreamerName, " because: ", err))
