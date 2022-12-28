@@ -630,6 +630,24 @@ Right now it's around 782 MiB, which is more than the Postgres database at 680 M
 I think this is because of `pgx`. See [this issue](https://github.com/jackc/pgx/issues/1127) and [this issue](https://github.com/jackc/pgx/issues/845).
 It seems to have been [resolved](https://github.com/jackc/pgx/blob/master/CHANGELOG.md#reduced-memory-usage-by-reusing-read-buffers) in `pgx v5`.
 
+## Backpressure
+
+- https://www.youtube.com/watch?v=m64SWl9bfvk&t=1676s
+- https://github.com/platinummonkey/go-concurrency-limits
+
+Basically, I'm using a pool of goroutines.
+When it becomes exhausted, it returns error responses.
+I use a bunch of `select`s.
+There's probably a simpler implementation, but this was the first thing that came to my mind.
+Before, the latency could theoretically become unbounded.
+If I threw 50000 requests per second, all the ports would become used up and the average latency would exceed a second.
+Now with 50000 requests per second, there are 43000 responses per second, with 7500 responses per second being successful and 35000 responses per second failing.
+Now, the latency is reasonable.
+
+```bash
+echo "GET http://localhost:3000/all/private/sub" | vegeta attack -duration 5000ms -rate 50000 | vegeta report --type=text
+```
+
 ## TODO
 
 - `pgx v4` uses too much memory. Migrate to `pgx v5`.

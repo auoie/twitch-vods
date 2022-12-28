@@ -26,15 +26,6 @@ func parseParam(param string) (string, error) {
 	return param[1:], nil
 }
 
-func makeAddCorsMiddleare(clientUrl string) func(httprouter.Handle) httprouter.Handle {
-	return func(f httprouter.Handle) httprouter.Handle {
-		return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-			w.Header().Set("Access-Control-Allow-Origin", clientUrl)
-			f(w, r, p)
-		}
-	}
-}
-
 func okHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 }
 
@@ -235,6 +226,37 @@ type TStreamResult struct {
 	Metadata *sqlvods.GetLatestStreamsFromStreamerLoginRow
 }
 
+type CustomHandler struct {
+	router    *httprouter.Router
+	clientUrl string
+	jobsCh    chan Job
+	ctx       context.Context
+}
+
+type Job struct {
+	router *httprouter.Router
+	w      http.ResponseWriter
+	r      *http.Request
+	done   chan struct{}
+}
+
+func (ch *CustomHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", ch.clientUrl)
+	done := make(chan struct{})
+	select {
+	case ch.jobsCh <- Job{router: ch.router, w: w, r: r, done: done}:
+		select {
+		case <-ch.ctx.Done():
+		case <-done:
+		}
+		return
+	case <-ch.ctx.Done():
+	default:
+	}
+	w.WriteHeader(http.StatusInternalServerError)
+	w.Write([]byte("Many requests"))
+}
+
 func main() {
 	databaseUrl, ok := os.LookupEnv("DATABASE_URL")
 	if !ok {
@@ -244,7 +266,6 @@ func main() {
 	if !ok {
 		log.Fatal("CLIENT_URL is missing for CORS")
 	}
-	addCors := makeAddCorsMiddleare(clientUrl)
 	ctx := context.Background()
 	config, err := pgxpool.ParseConfig(os.Getenv("DATABASE_URL"))
 	if err != nil {
@@ -264,16 +285,36 @@ func main() {
 	}
 	queries := sqlvods.New(conn)
 	router := httprouter.New()
+	jobsCh := make(chan Job)
+	handler := &CustomHandler{router: router, clientUrl: clientUrl, ctx: ctx, jobsCh: jobsCh}
+	for i := 0; i < 2000; i++ {
+		go func() {
+			for {
+				select {
+				case job := <-jobsCh:
+					job.router.ServeHTTP(job.w, job.r)
+					select {
+					case job.done <- struct{}{}:
+					case <-ctx.Done():
+						return
+					}
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
+	}
 
 	// pub-status: either public or private
 	// sub-status: either sub or free
-	router.GET("/", addCors(okHandler))
-	router.GET("/bing", addCors(bongHandler))
-	router.GET("/all/:pub-status/:sub-status", addCors(makeMostViewedHandler(ctx, queries)))
-	router.GET("/channels/:streamer", addCors(makeStreamerHandler(ctx, queries)))
+	router.GET("/", okHandler)
+	router.GET("/bing", bongHandler)
+	router.GET("/all/:pub-status/:sub-status", makeMostViewedHandler(ctx, queries))
+	router.GET("/channels/:streamer", makeStreamerHandler(ctx, queries))
 	router.GET("/m3u8/:streamid/:unix/index.m3u8", makeM3U8Handler(ctx, queries))
-	router.GET("/language/:language/all/:pub-status/:sub-status", addCors(makeAllLanguageHandler(ctx, queries)))
-	router.GET("/category/:game-id/all/:pub-status/:sub-status", addCors(makeAllCategoryHandler(ctx, queries)))
+	router.GET("/language/:language/all/:pub-status/:sub-status", makeAllLanguageHandler(ctx, queries))
+	router.GET("/category/:game-id/all/:pub-status/:sub-status", makeAllCategoryHandler(ctx, queries))
 	fmt.Println("Serving on port :3000")
-	http.ListenAndServe(":3000", router)
+
+	http.ListenAndServe(":3000", handler)
 }
