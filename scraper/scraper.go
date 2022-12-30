@@ -383,7 +383,6 @@ type vodCompressedBytesResult struct {
 func getValidDwp(ctx context.Context, videoData *vods.VideoData, client *http.Client) (*vods.ValidDwpResponse, error) {
 	dwp, err := getFirstValidDwpResponse(ctx, videoData, true, client)
 	if err == nil {
-		log.Println(fmt.Sprint("minus 0 success for ", *videoData))
 		return dwp, nil
 	}
 	dwp, err = getFirstValidDwpResponse(ctx, &vods.VideoData{
@@ -400,7 +399,6 @@ func getValidDwp(ctx context.Context, videoData *vods.VideoData, client *http.Cl
 		log.Println(fmt.Sprint("non-unix success for ", *videoData))
 		return dwp, nil
 	}
-	log.Println(fmt.Sprint("minus 0 and minus 1 error and non-unix error for ", *videoData, ": ", err))
 	return dwp, err
 }
 
@@ -436,6 +434,7 @@ func getVideoStatus(ctx context.Context, client graphql.Client, streamerId strin
 		return twitchgql.GetUserData(ctx, client, streamerId)
 	})
 	if err != nil {
+		log.Println(fmt.Sprint("error getting user data for (", streamerId, ", ", streamId, "): ", err))
 		return videoStatus{}, err
 	}
 	videos := response.User.Videos.Edges
@@ -445,6 +444,7 @@ func getVideoStatus(ctx context.Context, client graphql.Client, streamerId strin
 		seekPreviewsUrl := cur.Node.SeekPreviewsURL
 		dwp, err := vods.UrlToDomainWithPath(seekPreviewsUrl)
 		if err != nil {
+			log.Println(fmt.Sprint("error converting url to domain with path for (", streamerId, ", ", streamId, ", ", seekPreviewsUrl, "): ", err))
 			continue
 		}
 		if dwp.Path.VideoData.VideoId == streamId {
