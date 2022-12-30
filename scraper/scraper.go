@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"net"
+	"net/http"
 	"time"
 
 	"github.com/4kills/go-libdeflate/v2"
@@ -74,7 +76,7 @@ func edgeNodesMatchingAndNonEmpty(
 type fetchTwitchGqlForeverParams struct {
 	ctx                      context.Context
 	initialWaitVodQueue      *waitVodsPriorityQueue
-	client                   graphql.Client
+	twitchGqlClient          graphql.Client
 	sqlRequestTimeLimit      time.Duration
 	twitchGqlFetcherDelay    time.Duration
 	cursorResetThreshold     time.Duration
@@ -114,6 +116,15 @@ func twitchGqlResponseToSqlParams(
 	return result
 }
 
+func retryOnError[T any](doer func() (T, error)) (T, error) {
+	res, err := doer()
+	if err != nil {
+		log.Println(fmt.Sprint("retrying on error: ", err))
+		return doer()
+	}
+	return res, err
+}
+
 func fetchTwitchGqlForever(params fetchTwitchGqlForeverParams) {
 	log.Println("Inside fetchTwitchGqlForever...")
 	log.Println(fmt.Sprint("Fetcher delay: ", params.twitchGqlFetcherDelay))
@@ -148,7 +159,9 @@ func fetchTwitchGqlForever(params fetchTwitchGqlForeverParams) {
 			resetCursor()
 		}
 		// Request live streams
-		streams, err := twitchgql.GetStreams(params.ctx, params.client, params.numStreamsPerRequest, cursor)
+		streams, err := retryOnError(func() (*twitchgql.GetStreamsResponse, error) {
+			return twitchgql.GetStreams(params.ctx, params.twitchGqlClient, params.numStreamsPerRequest, cursor)
+		})
 		responseReturnedTime := time.Now().UTC()
 		responseReturnedTimeUnix := responseReturnedTime.Unix()
 		// If request failed, reset cursor
@@ -332,8 +345,8 @@ func processOldVodJobs(params processOldVodJobsParams) {
 	}
 }
 
-func getFirstValidDwpResponse(ctx context.Context, videoData *vods.VideoData) (*vods.ValidDwpResponse, error) {
-	dwp, err := vods.GetFirstValidDwp(ctx, videoData.GetDomainWithPathsList(vods.DOMAINS, 1))
+func getFirstValidDwpResponse(ctx context.Context, videoData *vods.VideoData, toUnix bool, client *http.Client) (*vods.ValidDwpResponse, error) {
+	dwp, err := vods.GetFirstValidDwp(ctx, videoData.GetDomainWithPathsList(vods.DOMAINS, 1, toUnix), client)
 	if err != nil {
 		return nil, err
 	}
@@ -367,27 +380,32 @@ type vodCompressedBytesResult struct {
 	duration        time.Duration
 }
 
-func getVodCompressedBytes(ctx context.Context, videoData *vods.VideoData, compressor *libdeflate.Compressor) (*vodCompressedBytesResult, error) {
-	dwp, err := getFirstValidDwpResponse(ctx, videoData)
-	if err != nil {
-		log.Println(fmt.Sprint("minus 0 error for ", videoData.StreamerName, ": ", err))
+func getValidDwp(ctx context.Context, videoData *vods.VideoData, client *http.Client) (*vods.ValidDwpResponse, error) {
+	dwp, err := getFirstValidDwpResponse(ctx, videoData, true, client)
+	if err == nil {
+		log.Println(fmt.Sprint("minus 0 success for ", *videoData))
+		return dwp, nil
 	}
-	if err != nil {
-		dwp, err = getFirstValidDwpResponse(ctx, &vods.VideoData{
-			StreamerName: videoData.StreamerName,
-			VideoId:      videoData.VideoId,
-			Time:         videoData.Time.Add(-time.Second),
-		})
-		if err != nil {
-			log.Println(fmt.Sprint("minus 1 error for ", videoData.StreamerName, ": ", err))
-		}
-		if err == nil {
-			log.Println("subtracted 1 second got result: ", *videoData)
-		}
+	dwp, err = getFirstValidDwpResponse(ctx, &vods.VideoData{
+		StreamerName: videoData.StreamerName,
+		VideoId:      videoData.VideoId,
+		Time:         videoData.Time.Add(-time.Second),
+	}, true, client)
+	if err == nil {
+		log.Println(fmt.Sprint("minus 1 success for ", *videoData))
+		return dwp, nil
 	}
-	if ctx.Err() == context.DeadlineExceeded {
-		log.Println(fmt.Sprint(context.DeadlineExceeded, ": fetching dwp response"))
+	dwp, err = getFirstValidDwpResponse(ctx, videoData, false, client)
+	if err == nil {
+		log.Println(fmt.Sprint("non-unix success for ", *videoData))
+		return dwp, nil
 	}
+	log.Println(fmt.Sprint("minus 0 and minus 1 error and non-unix error for ", *videoData, ": ", err))
+	return dwp, err
+}
+
+func getVodCompressedBytes(ctx context.Context, videoData *vods.VideoData, compressor *libdeflate.Compressor, client *http.Client) (*vodCompressedBytesResult, error) {
+	dwp, err := getValidDwp(ctx, videoData, client)
 	if err != nil {
 		log.Println(fmt.Sprint("Link was not found for ", videoData.StreamerName, " because: ", err))
 		return nil, err
@@ -414,7 +432,9 @@ type videoStatus struct {
 }
 
 func getVideoStatus(ctx context.Context, client graphql.Client, streamerId string, streamId string) (videoStatus, error) {
-	response, err := twitchgql.GetUserData(ctx, client, streamerId)
+	response, err := retryOnError(func() (*twitchgql.GetUserDataResponse, error) {
+		return twitchgql.GetUserData(ctx, client, streamerId)
+	})
 	if err != nil {
 		return videoStatus{}, err
 	}
@@ -444,7 +464,8 @@ func getVideoStatus(ctx context.Context, client graphql.Client, streamerId strin
 
 type hlsWorkerFetchCompressSendParams struct {
 	ctx              context.Context
-	client           graphql.Client
+	twitchGqlClient  graphql.Client
+	httpClient       *http.Client
 	oldVodJobsCh     chan *LiveVod
 	hlsFetcherDelay  time.Duration
 	compressor       *libdeflate.Compressor
@@ -467,10 +488,8 @@ func hlsWorkerFetchCompressSend(params hlsWorkerFetchCompressSendParams) {
 			return
 		case oldVod = <-params.oldVodJobsCh:
 		}
-		requestCtx, cancel := context.WithTimeout(params.ctx, params.requestTimeLimit)
 		requestInitiated := time.Now().UTC()
-		compressedBytesResult, err := getVodCompressedBytes(requestCtx, oldVod.GetVideoData(), params.compressor)
-		cancel()
+		compressedBytesResult, err := getVodCompressedBytes(params.ctx, oldVod.GetVideoData(), params.compressor, params.httpClient)
 		var result *VodResult
 		if err != nil {
 			result = &VodResult{
@@ -503,7 +522,7 @@ func hlsWorkerFetchCompressSend(params hlsWorkerFetchCompressSendParams) {
 				},
 			}
 		}
-		videoMeta, err := getVideoStatus(params.ctx, params.client, oldVod.StreamerId, oldVod.StreamId)
+		videoMeta, err := getVideoStatus(params.ctx, params.twitchGqlClient, oldVod.StreamerId, oldVod.StreamId)
 		if err == nil {
 			result.Public = sql.NullBool{Bool: videoMeta.public, Valid: true}
 			result.SeekPreviewsDomain = videoMeta.seekPreviewsDomain
@@ -563,6 +582,17 @@ type ScrapeTwitchLiveVodsWithGqlApiParams struct {
 	Queries *sqlvods.Queries
 }
 
+func makeRobustHttpClient(timeout time.Duration) *http.Client {
+	dialer := &net.Dialer{
+		Timeout: timeout,
+	}
+	transport := &http.Transport{DialContext: dialer.DialContext}
+	return &http.Client{
+		Timeout:   timeout,
+		Transport: transport,
+	}
+}
+
 // This function scares me.
 // This function scrapes the Twitch Graphql API and fetches .m3u8 files for streams that finish.
 // It doesn't exit if a Twitch Graphql API request fails.
@@ -573,7 +603,8 @@ func ScrapeTwitchLiveVodsWithGqlApi(ctx context.Context, params ScrapeTwitchLive
 	log.Println("Starting scraping...")
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	client := twitchgql.NewTwitchGqlClient(params.RequestTimeLimit)
+	twitchGqlClient := twitchgql.NewTwitchGqlClient(params.RequestTimeLimit)
+	httpClient := makeRobustHttpClient(params.RequestTimeLimit)
 	oldVodsCh := make(chan []*LiveVod)
 	oldVodJobsCh := make(chan *LiveVod)
 	resultsCh := make(chan *VodResult)
@@ -582,7 +613,7 @@ func ScrapeTwitchLiveVodsWithGqlApi(ctx context.Context, params ScrapeTwitchLive
 	go fetchTwitchGqlForever(
 		fetchTwitchGqlForeverParams{
 			ctx:                      ctx,
-			client:                   client,
+			twitchGqlClient:          twitchGqlClient,
 			initialWaitVodQueue:      params.InitialWaitVodQueue,
 			sqlRequestTimeLimit:      params.RequestTimeLimit,
 			twitchGqlFetcherDelay:    params.TwitchGqlFetcherDelay,
@@ -612,7 +643,8 @@ func ScrapeTwitchLiveVodsWithGqlApi(ctx context.Context, params ScrapeTwitchLive
 		}
 		go hlsWorkerFetchCompressSend(hlsWorkerFetchCompressSendParams{
 			ctx:              ctx,
-			client:           client,
+			twitchGqlClient:  twitchGqlClient,
+			httpClient:       httpClient,
 			oldVodJobsCh:     oldVodJobsCh,
 			hlsFetcherDelay:  params.HlsFetcherDelay,
 			compressor:       &compressor,

@@ -1,7 +1,7 @@
 package twitchgql
 
 import (
-	"crypto/tls"
+	"net"
 	"net/http"
 	"time"
 
@@ -14,26 +14,29 @@ type VodNode *GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStream
 
 type authedTransport struct {
 	clientID string
-	wrapped  http.RoundTripper
+	wrapped  *http.Transport
 }
 
 func (t *authedTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	req.Header.Set("Client-ID", t.clientID)
+	if req.Header != nil {
+		req.Header.Set("Client-ID", t.clientID)
+	}
 	return t.wrapped.RoundTrip(req)
 }
 
-func NewTwitchClient(timeout time.Duration) *http.Client {
-	return &http.Client{
-		Transport: &authedTransport{
-			clientID: CLIENT_ID,
-			wrapped:  &http.Transport{TLSNextProto: make(map[string]func(string, *tls.Conn) http.RoundTripper)},
-		},
+func newTwitchClient(timeout time.Duration) *http.Client {
+	dialer := &net.Dialer{
 		Timeout: timeout,
+	}
+	transport := &http.Transport{DialContext: dialer.DialContext}
+	return &http.Client{
+		Timeout:   timeout,
+		Transport: &authedTransport{clientID: CLIENT_ID, wrapped: transport},
 	}
 }
 
 func NewTwitchGqlClient(timeout time.Duration) graphql.Client {
-	httpClient := NewTwitchClient(timeout)
+	httpClient := newTwitchClient(timeout)
 	graphqlClient := graphql.NewClient("https://gql.twitch.tv/gql", httpClient)
 	return graphqlClient
 }
