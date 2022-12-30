@@ -1,7 +1,9 @@
 package twitchgql
 
 import (
+	"crypto/tls"
 	"net/http"
+	"time"
 
 	"github.com/Khan/genqlient/graphql"
 )
@@ -20,17 +22,18 @@ func (t *authedTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return t.wrapped.RoundTrip(req)
 }
 
-func NewTwitchClient() *http.Client {
+func NewTwitchClient(timeout time.Duration) *http.Client {
 	return &http.Client{
 		Transport: &authedTransport{
 			clientID: CLIENT_ID,
-			wrapped:  http.DefaultTransport,
+			wrapped:  &http.Transport{TLSNextProto: make(map[string]func(string, *tls.Conn) http.RoundTripper)},
 		},
+		Timeout: timeout,
 	}
 }
 
-func NewTwitchGqlClient() graphql.Client {
-	httpClient := NewTwitchClient()
+func NewTwitchGqlClient(timeout time.Duration) graphql.Client {
+	httpClient := NewTwitchClient(timeout)
 	graphqlClient := graphql.NewClient("https://gql.twitch.tv/gql", httpClient)
 	return graphqlClient
 }

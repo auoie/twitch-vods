@@ -72,22 +72,22 @@ func edgeNodesMatchingAndNonEmpty(
 }
 
 type fetchTwitchGqlForeverParams struct {
-	ctx                       context.Context
-	initialWaitVodQueue       *waitVodsPriorityQueue
-	client                    graphql.Client
-	twitchGqlRequestTimeLimit time.Duration
-	twitchGqlFetcherDelay     time.Duration
-	cursorResetThreshold      time.Duration
-	liveVodEvictionThreshold  time.Duration
-	waitVodEvictionThreshold  time.Duration
-	oldVodsCh                 chan []*LiveVod
-	minViewerCountToObserve   int
-	minViewerCountToRecord    int
-	queries                   *sqlvods.Queries
-	numStreamsPerRequest      int
-	cursorFactor              float64
-	oldVodsDelete             time.Duration
-	done                      chan struct{}
+	ctx                      context.Context
+	initialWaitVodQueue      *waitVodsPriorityQueue
+	client                   graphql.Client
+	sqlRequestTimeLimit      time.Duration
+	twitchGqlFetcherDelay    time.Duration
+	cursorResetThreshold     time.Duration
+	liveVodEvictionThreshold time.Duration
+	waitVodEvictionThreshold time.Duration
+	oldVodsCh                chan []*LiveVod
+	minViewerCountToObserve  int
+	minViewerCountToRecord   int
+	queries                  *sqlvods.Queries
+	numStreamsPerRequest     int
+	cursorFactor             float64
+	oldVodsDelete            time.Duration
+	done                     chan struct{}
 }
 
 func twitchGqlResponseToSqlParams(
@@ -148,11 +148,9 @@ func fetchTwitchGqlForever(params fetchTwitchGqlForeverParams) {
 			resetCursor()
 		}
 		// Request live streams
-		requestCtx, requestCancel := context.WithTimeout(params.ctx, params.twitchGqlRequestTimeLimit)
-		streams, err := twitchgql.GetStreams(requestCtx, params.client, params.numStreamsPerRequest, cursor)
+		streams, err := twitchgql.GetStreams(params.ctx, params.client, params.numStreamsPerRequest, cursor)
 		responseReturnedTime := time.Now().UTC()
 		responseReturnedTimeUnix := responseReturnedTime.Unix()
-		requestCancel()
 		// If request failed, reset cursor
 		if err != nil {
 			resetCursor()
@@ -251,14 +249,14 @@ func fetchTwitchGqlForever(params fetchTwitchGqlForeverParams) {
 			log.Println(fmt.Sprint("num stale vods: ", debugNumStaleVods))
 		}
 		// The queries to delete the old streams and upsert the new streams should be combined into a single transaction
-		requestCtx, requestCancel = context.WithTimeout(params.ctx, params.twitchGqlRequestTimeLimit)
+		requestCtx, requestCancel := context.WithTimeout(params.ctx, params.sqlRequestTimeLimit)
 		err = params.queries.DeleteOldStreams(requestCtx, time.Now().UTC().Add(-params.oldVodsDelete))
 		requestCancel()
 		if err != nil {
 			log.Println(fmt.Sprint("deleting old streams failed: ", err))
 			break
 		}
-		requestCtx, requestCancel = context.WithTimeout(params.ctx, params.twitchGqlRequestTimeLimit)
+		requestCtx, requestCancel = context.WithTimeout(params.ctx, params.sqlRequestTimeLimit)
 		err = params.queries.UpsertManyStreams(requestCtx, twitchGqlResponseToSqlParams(highViewNodes, responseReturnedTime))
 		requestCancel()
 		if err != nil {
@@ -372,7 +370,7 @@ type vodCompressedBytesResult struct {
 func getVodCompressedBytes(ctx context.Context, videoData *vods.VideoData, compressor *libdeflate.Compressor) (*vodCompressedBytesResult, error) {
 	dwp, err := getFirstValidDwpResponse(ctx, videoData)
 	if err != nil {
-		log.Println(fmt.Sprint("minus 0 error: ", err))
+		log.Println(fmt.Sprint("minus 0 error for ", videoData.StreamerName, ": ", err))
 	}
 	if err != nil {
 		dwp, err = getFirstValidDwpResponse(ctx, &vods.VideoData{
@@ -381,7 +379,7 @@ func getVodCompressedBytes(ctx context.Context, videoData *vods.VideoData, compr
 			Time:         videoData.Time.Add(-time.Second),
 		})
 		if err != nil {
-			log.Println(fmt.Sprint("minus 1 error: ", err))
+			log.Println(fmt.Sprint("minus 1 error for ", videoData.StreamerName, ": ", err))
 		}
 		if err == nil {
 			log.Println("subtracted 1 second got result: ", *videoData)
@@ -505,9 +503,7 @@ func hlsWorkerFetchCompressSend(params hlsWorkerFetchCompressSendParams) {
 				},
 			}
 		}
-		requestCtx, cancel = context.WithTimeout(params.ctx, params.requestTimeLimit)
-		videoMeta, err := getVideoStatus(requestCtx, params.client, oldVod.StreamerId, oldVod.StreamId)
-		cancel()
+		videoMeta, err := getVideoStatus(params.ctx, params.client, oldVod.StreamerId, oldVod.StreamId)
 		if err == nil {
 			result.Public = sql.NullBool{Bool: videoMeta.public, Valid: true}
 			result.SeekPreviewsDomain = videoMeta.seekPreviewsDomain
@@ -577,7 +573,7 @@ func ScrapeTwitchLiveVodsWithGqlApi(ctx context.Context, params ScrapeTwitchLive
 	log.Println("Starting scraping...")
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	client := twitchgql.NewTwitchGqlClient()
+	client := twitchgql.NewTwitchGqlClient(params.RequestTimeLimit)
 	oldVodsCh := make(chan []*LiveVod)
 	oldVodJobsCh := make(chan *LiveVod)
 	resultsCh := make(chan *VodResult)
@@ -585,22 +581,22 @@ func ScrapeTwitchLiveVodsWithGqlApi(ctx context.Context, params ScrapeTwitchLive
 	log.Println("Made twitchgql client and channels.")
 	go fetchTwitchGqlForever(
 		fetchTwitchGqlForeverParams{
-			ctx:                       ctx,
-			client:                    client,
-			initialWaitVodQueue:       params.InitialWaitVodQueue,
-			twitchGqlRequestTimeLimit: params.RequestTimeLimit,
-			twitchGqlFetcherDelay:     params.TwitchGqlFetcherDelay,
-			cursorResetThreshold:      params.CursorResetThreshold,
-			liveVodEvictionThreshold:  params.LiveVodEvictionThreshold,
-			waitVodEvictionThreshold:  params.WaitVodEvictionThreshold,
-			oldVodsCh:                 oldVodsCh,
-			minViewerCountToObserve:   params.MinViewerCountToObserve,
-			minViewerCountToRecord:    params.MinViewerCountToRecord,
-			queries:                   params.Queries,
-			numStreamsPerRequest:      params.NumStreamsPerRequest,
-			cursorFactor:              params.CursorFactor,
-			oldVodsDelete:             params.OldVodsDelete,
-			done:                      done,
+			ctx:                      ctx,
+			client:                   client,
+			initialWaitVodQueue:      params.InitialWaitVodQueue,
+			sqlRequestTimeLimit:      params.RequestTimeLimit,
+			twitchGqlFetcherDelay:    params.TwitchGqlFetcherDelay,
+			cursorResetThreshold:     params.CursorResetThreshold,
+			liveVodEvictionThreshold: params.LiveVodEvictionThreshold,
+			waitVodEvictionThreshold: params.WaitVodEvictionThreshold,
+			oldVodsCh:                oldVodsCh,
+			minViewerCountToObserve:  params.MinViewerCountToObserve,
+			minViewerCountToRecord:   params.MinViewerCountToRecord,
+			queries:                  params.Queries,
+			numStreamsPerRequest:     params.NumStreamsPerRequest,
+			cursorFactor:             params.CursorFactor,
+			oldVodsDelete:            params.OldVodsDelete,
+			done:                     done,
 		},
 	)
 	go processOldVodJobs(processOldVodJobsParams{

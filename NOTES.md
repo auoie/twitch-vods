@@ -648,6 +648,18 @@ Now, the latency is reasonable.
 echo "GET http://localhost:3000/all/private/sub" | vegeta attack -duration 5000ms -rate 50000 | vegeta report --type=text
 ```
 
+## Network Debugging
+
+To see the connections in the scraper container, use this.
+
+```bash
+sudo nsenter -t $(docker inspect -f '{{.State.Pid}}' twitch-vods-scraper) -n netstat
+```
+
+This comes from [here](https://stackoverflow.com/questions/40350456/docker-any-way-to-list-open-sockets-inside-a-running-docker-container).
+First, when it only uses the Twitch GQL endpoint, it shows the Postgresql address and an IP address associated with Fastly.
+See `whois $IP_ADDRESS` and `dig -x $IP_ADDRESS`.
+
 ## TODO
 
 - `pgx v4` uses too much memory. Migrate to `pgx v5`.

@@ -21,7 +21,7 @@ func main() {
 		2.0,
 		scraper.RunScraperParams{
 			TwitchGqlFetcherDelay:      333 * time.Millisecond,
-			RequestTimeLimit:           20 * time.Second,
+			RequestTimeLimit:           60 * time.Second,
 			LiveVodEvictionThreshold:   16 * time.Minute,
 			WaitVodEvictionThreshold:   31 * time.Minute,
 			MaxOldVodsQueueSize:        50000,
