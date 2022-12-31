@@ -325,6 +325,8 @@ I should not trust the graphql API to work all the time.
 I need to guarantee that the time I fetch a VOD is at least 30 minutes after the VOD ends.
 This is because there seems to be a cron job (maybe a lambda service) that runs every 30 minutes to mute videos on the twitch servers.
 This is described [here](https://www.reddit.com/r/osugame/comments/2cvspn/just_a_heads_up_twitchtv_is_now_muting_all_vods/).
+The above is incorrect.
+I guess videos are muted on the hour (e.g. 12:00AM, 01:00AM, ...).
 
 This is annoying.
 From `2022-12-01 08:57:50.429` to `2022-12-01 12:16:32.193`, a lot of the VODs just failed to fetch.
