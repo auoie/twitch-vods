@@ -662,36 +662,26 @@ This comes from [here](https://stackoverflow.com/questions/40350456/docker-any-w
 First, when it only uses the Twitch GQL endpoint, it shows the Postgresql address and an IP address associated with Fastly.
 See `whois $IP_ADDRESS` and `dig -x $IP_ADDRESS`.
 
+## Robust HTTP
+
+For random 16 minute intervals, the hls fetcher http client would return `context timeout` errors.
+Basically, it has to do with how Go [implements](https://github.com/golang/go/issues/36026#issuecomment-569029370) HTTP/2 and how `ip_retries2` [works](https://blog.cloudflare.com/when-tcp-sockets-refuse-to-die/).
+To replicate it, just [block](https://github.com/golang/go/issues/30702) the underlying TCP connection with `iptables`.
+The solution is to be mindful of what Go [timeouts](https://blog.cloudflare.com/the-complete-guide-to-golang-net-http-timeouts/) actually do.
+I should try to make [adverserial](https://blog.cloudflare.com/exposing-go-on-the-internet/) HTTP clients that don't close themselves in order to test the string API.
+
+Note that when turning on a VPN, the HTTP clients in the docker containers will not be able to establish any [connections](https://serverfault.com/questions/895278/not-able-to-access-to-the-internet-in-a-container-on-a-vpn).
+
 ## TODO
 
+- Use caddy as a reverse proxy. Also serve pregzipped, prebrotlied files from the UI.
+- Deploy with Terraform and cloudflare.
+  Use [Authenticated origin pulls](https://caddy.community/t/setting-up-cloudflare-with-caddy/13911/6) and the cloudflare [module](https://github.com/caddy-dns/cloudflare) for caddy.
 - `pgx v4` uses too much memory. Migrate to `pgx v5`.
   `sqlc v16` is not compatible with `pgx v5`.
   Support has been merged into the main branch. I should build `sqlc` from source and set it to generate `pgx v5` code.
-- Try to avoid the cloudfront rate limit by making a custom govods in here to make fewer requests
-  - round robin, but if a url is successful, use that as the url of the next stream to start
-  - reduce the number of fetchers from 3 to 2
-- Fetch the HLS URLs in order of views descending. When I started being rate-limited, this leads to the problem of high view VODs recording as have no m3u8 file.
-  The solution is to have a channel that holds all of the failed VODs from the past minute.
-  If there are more the 3 failed public VODs in the past minute
-  - pause the old vods eviction for 5 minutes
-  - put those VODs back in the old vods queue
-  - include metadata on the maximum number of requests made on that url
-- On scraper restart, change from the live vod queue to a wait vod queue.
-  Right now, if a streamer has a stream in the wait vod queue and a stream in the live vod queue, the wait vod queue entry will be skipped.
-- When I turn on my VPN and turn if off, the Twitch GQL requests work but the cloudfront requests don't work.
-  I should try to understand why and fix it or find some way to handle this case.
-  In this case, a lot of VODS get the hls_domain fetched, but the sub_only and other fields are not fetched.
-  I should probably just keep restarting the scraper until it continues to work.
-  My solution will be to send vod results back into the old vod queue.
-  Keep count of how many times the twitch gql client failed in a row in the main loop.
-  If it exceeds 100, then break and restart.
-- Get streamer icon as well
 - I'm maintaining an infinite for loop.
   I should check if all the goroutines are closed using some tool to inspect the program internals.
-- The m3u8 cloudfront links stopped working for about 5 minutes.
-  As a result, like 60 public videos didn't have their m3u8 contents fetched.
-  I'm not sure how to handle this.
-- Print debugging statements and errors separately.
 - Add some private API so that I can configure the client ID and set of cloudfront domains at runtime.
   Maybe put these in a database so that I can retrieve them if the program restarts.
   Maybe have some additional service that monitors for client id and cloudfront domains to periodically update the database.

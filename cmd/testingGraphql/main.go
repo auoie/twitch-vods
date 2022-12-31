@@ -22,7 +22,8 @@ func runForever(graphqlClient graphql.Client) error {
 			for {
 				response, err := twitchgql.GetStreams(context.Background(), graphqlClient, 30, cursor)
 				if err != nil {
-					return err
+					log.Println(err)
+					continue
 				}
 				streams := response.Streams
 				edges := streams.Edges
@@ -58,9 +59,18 @@ func print(response any) error {
 	fmt.Println(string(bytes))
 	return nil
 }
-
+func retryOnError[T any](doer func() (T, error)) (T, error) {
+	res, err := doer()
+	if err != nil {
+		log.Println(fmt.Sprint("retrying on error: ", err))
+		return doer()
+	}
+	return res, err
+}
 func threeUsersInformation(graphqlClient graphql.Client, user1, user2, user3 string) error {
-	response, err := twitchgql.GetThreeUsers(context.Background(), graphqlClient, user1, user2, user3)
+	response, err := retryOnError(func() (*twitchgql.GetThreeUsersResponse, error) {
+		return twitchgql.GetThreeUsers(context.Background(), graphqlClient, user1, user2, user3)
+	})
 	if err != nil {
 		return err
 	}
@@ -77,9 +87,10 @@ func threeUsersInformation(graphqlClient graphql.Client, user1, user2, user3 str
 
 func main() {
 	fmt.Println("Running...")
-	graphqlClient := twitchgql.NewTwitchGqlClient(time.Minute)
+	graphqlClient := twitchgql.NewTwitchGqlClient(5 * time.Second)
 	err := threeUsersInformation(graphqlClient, "gmhikaru", "stoopzz", "duke")
 	if err != nil {
 		log.Fatal(err)
 	}
+	runForever(graphqlClient)
 }
