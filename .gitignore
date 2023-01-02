@@ -1,3 +1,7 @@
 /.vscode/
 migration_lock.toml
 /.env
+*.tfvars
+.terraform/
+*.tfstate
+*.tfstate.backup

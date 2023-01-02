@@ -1,0 +1,6 @@
+:3000 {
+  reverse_proxy twitch-vods-string-api:3000
+  header {
+    -Server
+  }
+}

@@ -492,6 +492,7 @@ To make building faster, use the [build cache](https://www.reddit.com/r/golang/c
 ```bash
 docker build -f ./docker/stringApi/Dockerfile -t twitch-vods-string-api:latest . --progress plain
 docker build -f ./docker/scraper/Dockerfile -t twitch-vods-scraper:latest . --progress plain
+docker build -f ./docker/caddy/Dockerfile -t twitch-vods-reverse-proxy:latest . --progress plain
 ```
 
 Then we can create the containers.
@@ -520,7 +521,6 @@ docker run -d --restart always \
   --name twitch-vods-string-api \
   -e DATABASE_URL=$DOCKER_POSTGRES_DB \
   -e CLIENT_URL="*" \
-  -p 3000:3000 \
   --network twitch-vods-network \
   twitch-vods-string-api
 docker run -d --restart always \
@@ -528,6 +528,12 @@ docker run -d --restart always \
   -e DATABASE_URL=$DOCKER_POSTGRES_DB \
   --network twitch-vods-network \
   twitch-vods-scraper
+docker run -d --restart always \
+  --name twitch-vods-reverse-proxy \
+  --network twitch-vods-network \
+  -v $PWD/caddy/dev.Caddyfile:/etc/caddy/Caddyfile:ro \
+  -p 3000:3000 \
+  twitch-vods-reverse-proxy
 ```
 
 ## Migrating from Old Docker to New Docker
@@ -672,17 +678,34 @@ I should try to make [adverserial](https://blog.cloudflare.com/exposing-go-on-th
 
 Note that when turning on a VPN, the HTTP clients in the docker containers will not be able to establish any [connections](https://serverfault.com/questions/895278/not-able-to-access-to-the-internet-in-a-container-on-a-vpn).
 
+## Domain and Cloudflare Setup
+
+Buy domain from porkbun.
+Alternatively, see [here](https://domcomp.com/) for domain deals.
+Create cloudflare website portal.
+In porkbun dashbaord, set cloudflare nam servers as authoritative name servers.
+Delete all DNS settings.
+Then set everything up with terraform.
+
+## Caddy
+
+To setup Docker, Caddy, and Cloudflare, see [here](https://caddy.community/t/setting-up-cloudflare-with-caddy/13911).
+
 ## TODO
 
-- Use caddy as a reverse proxy. Also serve pregzipped, prebrotlied files from the UI.
+- Use caddy as a reverse proxy. Don't use it to serve the static SPA. Just use some SAAS that does this.
 - Deploy with Terraform and cloudflare.
   Use [Authenticated origin pulls](https://caddy.community/t/setting-up-cloudflare-with-caddy/13911/6) and the cloudflare [module](https://github.com/caddy-dns/cloudflare) for caddy.
 - `pgx v4` uses too much memory. Migrate to `pgx v5`.
   `sqlc v16` is not compatible with `pgx v5`.
   Support has been merged into the main branch. I should build `sqlc` from source and set it to generate `pgx v5` code.
+- I'm using `go-libdeflate` which is using version 1.6 of `libdeflate`.
+  The latest version of `libdeflate` is 1.15
+  It caused [this issue](https://github.com/4kills/go-libdeflate/issues/13).
+  Either make a pull request or fork the project to update the version of `libdeflate` in `go-libdeflate`.
 - I'm maintaining an infinite for loop.
   I should check if all the goroutines are closed using some tool to inspect the program internals.
-- Add some private API so that I can configure the client ID and set of cloudfront domains at runtime.
+- Maybe add some private API so that I can configure the client ID and set of cloudfront domains at runtime.
   Maybe put these in a database so that I can retrieve them if the program restarts.
   Maybe have some additional service that monitors for client id and cloudfront domains to periodically update the database.
 - Maybe update the list of domains with the domains retrieved via graphql and persist this to DB

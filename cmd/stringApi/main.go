@@ -229,32 +229,11 @@ type TStreamResult struct {
 type CustomHandler struct {
 	router    *httprouter.Router
 	clientUrl string
-	jobsCh    chan Job
-	ctx       context.Context
-}
-
-type Job struct {
-	router *httprouter.Router
-	w      http.ResponseWriter
-	r      *http.Request
-	done   chan struct{}
 }
 
 func (ch *CustomHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", ch.clientUrl)
-	done := make(chan struct{})
-	select {
-	case ch.jobsCh <- Job{router: ch.router, w: w, r: r, done: done}:
-		select {
-		case <-ch.ctx.Done():
-		case <-done:
-		}
-		return
-	case <-ch.ctx.Done():
-	default:
-	}
-	w.WriteHeader(http.StatusInternalServerError)
-	w.Write([]byte("Many requests"))
+	ch.router.ServeHTTP(w, r)
 }
 
 func main() {
@@ -285,25 +264,7 @@ func main() {
 	}
 	queries := sqlvods.New(conn)
 	router := httprouter.New()
-	jobsCh := make(chan Job)
-	handler := &CustomHandler{router: router, clientUrl: clientUrl, ctx: ctx, jobsCh: jobsCh}
-	for i := 0; i < 2000; i++ {
-		go func() {
-			for {
-				select {
-				case job := <-jobsCh:
-					job.router.ServeHTTP(job.w, job.r)
-					select {
-					case job.done <- struct{}{}:
-					case <-ctx.Done():
-						return
-					}
-				case <-ctx.Done():
-					return
-				}
-			}
-		}()
-	}
+	handler := &CustomHandler{router: router, clientUrl: clientUrl}
 
 	// pub-status: either public or private
 	// sub-status: either sub or free

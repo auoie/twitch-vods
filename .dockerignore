@@ -1,6 +1,8 @@
 /.vscode/
+/caddy/
 /docker/
 /sqlc/
+/terraform/
 *.md
 *.yml
 *.yaml
