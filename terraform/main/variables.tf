@@ -9,11 +9,6 @@ variable "domain_name" {
   type        = string
 }
 
-variable "cloudflare_zone_id" {
-  description = "Zone ID associated with your account for API operations"
-  type        = string
-}
-
 variable "linode_api_token" {
   description = "Linode API token "
   type        = string
@@ -22,6 +17,12 @@ variable "linode_api_token" {
 
 variable "ip_address" {
   description = "My IP address for SSH firewall settings"
+  type        = string
+  sensitive   = true
+}
+
+variable "cloudflare_origin_ca_key" {
+  description = "Cloudflare origin CA key, found at the bottom of the API tokens page"
   type        = string
   sensitive   = true
 }

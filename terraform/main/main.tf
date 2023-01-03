@@ -1,8 +1,19 @@
+# Create a CSR and generate a CA certificate
+resource "tls_private_key" "key" {
+  algorithm = "RSA"
+}
+
+resource "tls_cert_request" "request" {
+  private_key_pem = tls_private_key.key.private_key_pem
+}
+
 module "cloudflare" {
-  source      = "../cloudflare"
-  api_token   = var.cloudflare_api_token
-  zone_id     = var.cloudflare_zone_id
-  domain_name = var.domain_name
+  source           = "../cloudflare"
+  api_token        = var.cloudflare_api_token
+  domain_name      = var.domain_name
+  server_ipv4      = module.linode.server_ip4
+  origin_ca_key    = var.cloudflare_origin_ca_key
+  cert_request_pem = tls_cert_request.request.cert_request_pem
 }
 
 module "linode" {

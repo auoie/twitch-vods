@@ -492,7 +492,6 @@ To make building faster, use the [build cache](https://www.reddit.com/r/golang/c
 ```bash
 docker build -f ./docker/stringApi/Dockerfile -t twitch-vods-string-api:latest . --progress plain
 docker build -f ./docker/scraper/Dockerfile -t twitch-vods-scraper:latest . --progress plain
-docker build -f ./docker/caddy/Dockerfile -t twitch-vods-reverse-proxy:latest . --progress plain
 ```
 
 Then we can create the containers.
@@ -531,9 +530,9 @@ docker run -d --restart always \
 docker run -d --restart always \
   --name twitch-vods-reverse-proxy \
   --network twitch-vods-network \
-  -v $PWD/caddy/dev.Caddyfile:/etc/caddy/Caddyfile:ro \
+  -v $PWD/caddy/dev/Caddyfile:/etc/caddy/Caddyfile:ro \
   -p 3000:3000 \
-  twitch-vods-reverse-proxy
+  caddy:2.6-alpine
 ```
 
 ## Migrating from Old Docker to New Docker
@@ -680,16 +679,36 @@ Note that when turning on a VPN, the HTTP clients in the docker containers will 
 
 ## Domain and Cloudflare Setup
 
-Buy domain from porkbun.
+Buy a domain from porkbun.
 Alternatively, see [here](https://domcomp.com/) for domain deals.
-Create cloudflare website portal.
-In porkbun dashbaord, set cloudflare nam servers as authoritative name servers.
-Delete all DNS settings.
+
+```text
+diva.ns.cloudflare.com
+rajeev.ns.cloudflare.com
+```
+
+In the porkbun dashboard, set the cloudflare name servers as the authoritative name servers.
+They are shown above.
+
+Now create a Cloudflare API token.
+The way I did it was to use the "read everything" template and then to delete everything but the zone rules.
+Then changed the settings from `Read` to the most permissive settings for each of the rules.
+Then I set it to all zones on my account.
+
+Now create a Linode API token. I just gave it all permissions.
+
 Then set everything up with terraform.
 
 ## Caddy
 
 To setup Docker, Caddy, and Cloudflare, see [here](https://caddy.community/t/setting-up-cloudflare-with-caddy/13911).
+See [here](https://samjmck.com/en/blog/using-caddy-with-cloudflare/) to setup authenticated origin pulls.
+To tune performance, see [here](https://news.ycombinator.com/item?id=32865497).
+
+## Terraform Cloudflare Issues
+
+- https://github.com/cloudflare/terraform-provider-cloudflare/issues/2116
+- https://github.com/cloudflare/terraform-provider-cloudflare/issues/1711
 
 ## TODO
 

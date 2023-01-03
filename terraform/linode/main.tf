@@ -32,6 +32,14 @@ resource "linode_firewall" "firewall" {
     ports    = "22"
     ipv4     = ["${var.ip_address}/32"]
   }
+  inbound {
+    label    = "allow-https"
+    action   = "ACCEPT"
+    protocol = "TCP"
+    ports    = 443
+    ipv4     = ["0.0.0.0/0"]
+    ipv6     = ["::/0"]
+  }
   outbound_policy = "ACCEPT"
   linodes         = [linode_instance.instance.id]
 }
@@ -41,4 +49,14 @@ resource "linode_instance" "instance" {
   region          = "us-west"
   type            = "g6-nanode-1"
   authorized_keys = [trimspace(file("~/.ssh/id_ed25519.pub"))]
+}
+
+output "server_ip4" {
+  value       = linode_instance.instance.ip_address
+  description = "IPv4 address of the Linode server"
+}
+
+output "server_ipv6" {
+  value       = linode_instance.instance.ipv6
+  description = "IPv6 address of the Linode server"
 }
