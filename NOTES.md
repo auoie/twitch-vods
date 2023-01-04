@@ -527,17 +527,21 @@ docker run -d --restart always \
   -e DATABASE_URL=$DOCKER_POSTGRES_DB \
   --network twitch-vods-network \
   twitch-vods-scraper
+mkdir -p ~/docker/twitch-vods/twitch-vods-caddy
+cp ./caddy/dev/Caddyfile ~/docker/twitch-vods/twitch-vods-caddy
 docker run -d --restart always \
-  --name twitch-vods-reverse-proxy \
+  --name twitch-vods-caddy \
   --network twitch-vods-network \
-  -v $PWD/caddy/dev/Caddyfile:/etc/caddy/Caddyfile:ro \
+  -v ~/docker/twitch-vods/twitch-vods-caddy/Caddyfile:/etc/caddy/Caddyfile:ro \
   -p 3000:3000 \
   caddy:2.6-alpine
+mkdir -p ~/docker/twitch-vods/twitch-vods-nginx
+cp ./nginx/dev/nginx.conf ~/docker/twitch-vods/twitch-vods-nginx
 docker run -d --restart always \
   --name twitch-vods-nginx \
   --network twitch-vods-network \
-  -v $PWD/nginx/dev/nginx.conf:/etc/nginx/nginx.conf:ro \
-  -p 4000:8080 \
+  -v ~/docker/twitch-vods/twitch-vods-nginx/nginx.conf:/etc/nginx/nginx.conf:ro \
+  -p 4000:4000 \
   nginx:1.23
 ```
 
@@ -770,15 +774,19 @@ docker run -d --restart always \
   -e DATABASE_URL=$DOCKER_POSTGRES_DB \
   --network host \
   twitch-vods-scraper
+mkdir -p ~/docker/twitch-vods/twitch-vods-caddy
+cp ./caddy/dev/Caddyfile ~/docker/twitch-vods/twitch-vods-caddy
 docker run -d --restart always \
-  --name twitch-vods-reverse-proxy \
+  --name twitch-vods-caddy \
   --network host \
-  -v $PWD/caddy/dev/Caddyfile:/etc/caddy/Caddyfile:ro \
+  -v ~/docker/twitch-vods/twitch-vods-caddy/Caddyfile:/etc/caddy/Caddyfile:ro \
   caddy:2.6-alpine
+mkdir -p ~/docker/twitch-vods/twitch-vods-nginx
+cp ./nginx/dev/nginx.conf ~/docker/twitch-vods/twitch-vods-nginx
 docker run -d --restart always \
   --name twitch-vods-nginx \
   --network host \
-  -v $PWD/nginx/dev/nginx.conf:/etc/nginx/nginx.conf:ro \
+  -v ~/docker/twitch-vods/twitch-vods-nginx/nginx.conf:/etc/nginx/nginx.conf:ro \
   nginx:1.23
 ```
 
@@ -793,6 +801,11 @@ The NGINX flame is very short.
 Also, NGINX uses like 10 MiB compared to Caddy which uses 100 MiB.
 I should rewrite the API in Rust.
 
+![perf-kernel-bridge-nginx](https://user-images.githubusercontent.com/105099407/210490723-becb7f83-efca-4e5e-9079-7262d9b2e8fd.svg)
+![perf-kernel-host-nginx](https://user-images.githubusercontent.com/105099407/210490975-bd9abfea-a942-42f3-9326-0df88094af6d.svg)
+![perf-kernel-bridge-caddy](https://user-images.githubusercontent.com/105099407/210491203-d1c5245a-9604-4542-bb4f-43db46c00e77.svg)
+![perf-kernel-host-caddy](https://user-images.githubusercontent.com/105099407/210491096-7507554e-41ff-4aaa-ba74-3983231c45c1.svg)
+
 ```bash
 echo "GET http://localhost:4000/all/private/sub" | vegeta attack -duration 5000ms -rate 8000 | vegeta report --type=text
 # git clone https://github.com/brendangregg/FlameGraph && cd FlameGraph
@@ -800,6 +813,10 @@ sudo perf record -F 99 -a -g -- sleep 8
 sudo perf script -i perf.data | ./stackcollapse-perf.pl > out.perf-folded
 ./flamegraph.pl out.perf-folded > perf-kernel.svg
 ```
+
+Overall, using the host network reduces the overhead.
+But it easier to develop with a bridge network.
+For convenience, I will continue to use the bridge network.
 
 ## TODO
 
