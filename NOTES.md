@@ -533,6 +533,12 @@ docker run -d --restart always \
   -v $PWD/caddy/dev/Caddyfile:/etc/caddy/Caddyfile:ro \
   -p 3000:3000 \
   caddy:2.6-alpine
+docker run -d --restart always \
+  --name twitch-vods-nginx \
+  --network twitch-vods-network \
+  -v $PWD/nginx/dev/nginx.conf:/etc/nginx/nginx.conf:ro \
+  -p 4000:8080 \
+  nginx:1.23
 ```
 
 ## Migrating from Old Docker to New Docker
@@ -637,6 +643,19 @@ Right now it's around 782 MiB, which is more than the Postgres database at 680 M
 I think this is because of `pgx`. See [this issue](https://github.com/jackc/pgx/issues/1127) and [this issue](https://github.com/jackc/pgx/issues/845).
 It seems to have been [resolved](https://github.com/jackc/pgx/blob/master/CHANGELOG.md#reduced-memory-usage-by-reusing-read-buffers) in `pgx v5`.
 
+Is the memory usage shown by `docker stats` even accurate? Yeah.
+As shown in [this issue](https://github.com/moby/moby/issues/10824#issuecomment-292778896),
+the memory usage used to be completely wrong because it included the page cache in the value.
+But now it [subtracts](https://github.com/docker/cli/blob/53f8ed4bec07084db4208f55987a2ea94b7f01d6/cli/command/container/stats_helpers.go#L239-L249) the `inactive_file` value as mentioned in [this issue](https://github.com/moby/moby/issues/32253#issuecomment-992175193).
+So this means it's accurate.
+Verify by running
+
+```bash
+curl --unix-socket /var/run/docker.sock http://localhost/containers/twitch-vods-string-api/stats\?stream\=false | jq ".memory_stats"
+```
+
+See [here](https://lobste.rs/s/p2y2xr) for remarks on load testing from a contributor of `vegeta`.
+
 ## Backpressure
 
 - https://www.youtube.com/watch?v=m64SWl9bfvk&t=1676s
@@ -709,6 +728,78 @@ To tune performance, see [here](https://news.ycombinator.com/item?id=32865497).
 
 - https://github.com/cloudflare/terraform-provider-cloudflare/issues/2116
 - https://github.com/cloudflare/terraform-provider-cloudflare/issues/1711
+
+## Development Docker with the Host Network
+
+When running Caddy and NGINX using the `--network host` flag,
+I initially got the error
+
+```text
+Error: loading initial config: loading new config: starting caddy administration endpoint: listen tcp: lookup localhost on 192.168.1.1:53: no such host
+```
+
+Basically, I think happens because `/etc/resolv.conf` by default contains `nameserver 192.168.1.1`.
+Port 53 is used for DNS (Domain Name Resolution).
+In particular, I think it tries to resolve `localhost` since by [default](https://caddy.community/t/caddy-setup-issue-address-already-in-use/14125/2) Caddy's administration endpoint is at `localhost:2019`. So the solution is to replace it with `:2019` and to replace `localhost` everywhere with `0.0.0.0`.
+
+```bash
+# set PASSWORD env variable
+source ./.env
+DOCKER_POSTGRES_DB="postgresql://twitch-vods-admin:$PASSWORD@0.0.0.0:5432/twitch-vods"
+mkdir -p ~/docker/twitch-vods/twitch-vods-db
+docker run -d --restart always \
+  --name twitch-vods-db \
+  -e POSTGRES_USER="twitch-vods-admin" \
+  -e POSTGRES_PASSWORD=$PASSWORD \
+  -e POSTGRES_DB="twitch-vods" \
+  -v ~/docker/twitch-vods/twitch-vods-db/data:/var/lib/postgresql/data \
+  -v ~/docker/twitch-vods/twitch-vods-db/app:/home/app \
+  --network host\
+  postgres:15
+migrate -source file://sqlc/migrations -database $DOCKER_POSTGERS_DB up
+
+# before running the stateless stuff below, migrate the data from the previous database
+docker run -d --restart always \
+  --name twitch-vods-string-api \
+  -e DATABASE_URL=$DOCKER_POSTGRES_DB \
+  -e CLIENT_URL="*" \
+  --network host \
+  twitch-vods-string-api
+docker run -d --restart always \
+  --name twitch-vods-scraper \
+  -e DATABASE_URL=$DOCKER_POSTGRES_DB \
+  --network host \
+  twitch-vods-scraper
+docker run -d --restart always \
+  --name twitch-vods-reverse-proxy \
+  --network host \
+  -v $PWD/caddy/dev/Caddyfile:/etc/caddy/Caddyfile:ro \
+  caddy:2.6-alpine
+docker run -d --restart always \
+  --name twitch-vods-nginx \
+  --network host \
+  -v $PWD/nginx/dev/nginx.conf:/etc/nginx/nginx.conf:ro \
+  nginx:1.23
+```
+
+## Bridge vs Host Network
+
+The docker bridge network adds some overhead.
+It makes more system calls.
+See [this visualization](https://stackoverflow.com/a/49274333) with flamegraphs.
+
+Caddy and the string-api flames are very tall.
+The NGINX flame is very short.
+Also, NGINX uses like 10 MiB compared to Caddy which uses 100 MiB.
+I should rewrite the API in Rust.
+
+```bash
+echo "GET http://localhost:4000/all/private/sub" | vegeta attack -duration 5000ms -rate 8000 | vegeta report --type=text
+# git clone https://github.com/brendangregg/FlameGraph && cd FlameGraph
+sudo perf record -F 99 -a -g -- sleep 8
+sudo perf script -i perf.data | ./stackcollapse-perf.pl > out.perf-folded
+./flamegraph.pl out.perf-folded > perf-kernel.svg
+```
 
 ## TODO
 

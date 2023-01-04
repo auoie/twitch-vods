@@ -1,5 +1,8 @@
-:3000 {
-  reverse_proxy twitch-vods-string-api:3000
+{
+  admin :2019
+}
+:5000 {
+  reverse_proxy http://0.0.0.0:3000
   header {
     -Server
   }
