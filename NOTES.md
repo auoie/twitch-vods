@@ -649,6 +649,43 @@ See an approximation of the number of connections with `netstat -atn | wc -l`.
 Get "http://localhost:3000/all/private/sub": dial tcp 0.0.0.0:0->[::1]:3000: bind: address already in use
 ```
 
+What is the exact limit? Can we set it higher?
+Based on [this three part blog series](https://medium.com/free-code-camp/load-testing-haproxy-part-2-4c8677780df6), the default limit of ephemeral ports is about 28,000.
+This can be found with `cat /proc/sys/net/ipv4/ip_local_port_range` or `sysctl net.ipv4.ip_local_port_range`.
+We get `60999 - 32768 + 1 = 28322`. That is the limit of ephemeral ports by default.
+This can be increased to `2^16 - 2^10 = 64512` with `echo 1024 65535 > /proc/sys/net/ipv4/ip_local_port_range`.
+The ports numbered `0 - 1023` are static.
+
+As a corollary, just as a server port can handle a high number of sockets to a very high number of clients, each port in a client's computer can handle a high number of sockets to a very high number of servers.
+See [this answer](https://stackoverflow.com/a/27182614) for details.
+Each ephemeral port can support connections to many servers.
+The theoretical maximum number of sockets is the maximum number of file descriptors, which is `cat /proc/sys/fs/file-max`.
+In my PC, this evaluates to `9223372036854775807`.
+This is `2^63 - 1`. This will never be reached.
+An actual bound for a single process `ulimit -Sn`. On my PC, this is `524288`.
+This equals `2^19`. This is the maximum [number](https://unix.stackexchange.com/questions/447583/ulimit-vs-file-max) of file descriptors for a process.
+
+Right now I'm running a Caddy container as a reverse proxy to a single string-api container.
+From the discussion above, there can be at most `28322` concurrent connections from Caddy to the server. To increase this, you would increase the number of servers and use Caddy as a load balancer with round-robin distribution (or something). So adding 20 server containers would establish a an upper bound of `20 * 28322 = 566440` concurrent connections (this is if we choose not to increase the number of ephemeral ports in each server container and in the caddy container).
+In the Caddy container, we have `ulimit -Sn = 1048576 = 2^20`.
+At that point, the value `2^20 / 2 = 524288` would be the new upper bound of connections.
+We divide by two because the proxy maintains a connection to the client and a connection to the server. So each client that Caddy maintains adds two sockets to the process.
+
+Rather than running a bunch of api docker containers,
+just have the API server [listen](https://news.ycombinator.com/item?id=21223677) on 20 ports.
+For example, `localhost:3000-3019`. Then load balance across those 20 ports.
+So that should be able to support client 524888 connections if we keep the default Docker `ulimit -Sn` value. Though, to verify this, you would need to run a [benchmark](https://medium.com/free-code-camp/how-we-fine-tuned-haproxy-to-achieve-2-000-000-concurrent-ssl-connections-d017e61a4d27).
+
+What are `cat /proc/sys/net/ipv4/ip_local_port_range` and `ulimit -Sn` in a Docker scratch container? Well, `ulimit -Sn` appears to be [1048576](https://github.com/docker/docker-ce/commit/c1870c571be896214f5f47b62da8fb7587e28cb6). This is the default for all docker containers, as set by the docker [daemon](https://docs.docker.com/engine/reference/commandline/dockerd/).
+To verify this we can [look](https://www.mgasch.com/2017/11/scratch/) inside the container.
+
+```bash
+# look
+sudo ls /proc/$(docker inspect -f '{{.State.Pid}}' twitch-vods-string-api)/root
+# docker
+docker run --rm -it --pid container:twitch-vods-string-api alpine
+```
+
 View the CPU and memory usage of each docker container with `docker stats`.
 The memory usage of `twitch-vods-string-api` after being load tested is really high.
 Right now it's around 782 MiB, which is more than the Postgres database at 680 MiB.
