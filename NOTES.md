@@ -543,6 +543,14 @@ docker run -d --restart always \
   -v ~/docker/twitch-vods/twitch-vods-nginx/nginx.conf:/etc/nginx/nginx.conf:ro \
   -p 4000:4000 \
   nginx:1.23
+mkdir -p ~/docker/twitch-vods/twitch-vods-haproxy
+cp ./haproxy/dev/haproxy.cfg ~/docker/twitch-vods/twitch-vods-haproxy
+docker run -d --restart always \
+  --name twitch-vods-haproxy \
+  --network twitch-vods-network \
+  -v ~/docker/twitch-vods/twitch-vods-haproxy:/usr/local/etc/haproxy:ro \
+  -p 5000:3000 \
+  haproxy:2.7
 ```
 
 ## Migrating from Old Docker to New Docker
@@ -727,6 +735,9 @@ Then set everything up with terraform.
 To setup Docker, Caddy, and Cloudflare, see [here](https://caddy.community/t/setting-up-cloudflare-with-caddy/13911).
 See [here](https://samjmck.com/en/blog/using-caddy-with-cloudflare/) to setup authenticated origin pulls.
 To tune performance, see [here](https://news.ycombinator.com/item?id=32865497).
+
+Caddy's memory usage is absurdly high compared to NGINX.
+See [here](https://github.com/caddyserver/caddy/issues/3834) for some cool graphs.
 
 ## Terraform Cloudflare Issues
 
