@@ -528,7 +528,7 @@ docker run -d --restart always \
   --network twitch-vods-network \
   twitch-vods-scraper
 mkdir -p ~/docker/twitch-vods/twitch-vods-caddy
-cp ./caddy/dev/Caddyfile ~/docker/twitch-vods/twitch-vods-caddy
+cp ./proxy/caddy/dev/Caddyfile ~/docker/twitch-vods/twitch-vods-caddy
 docker run -d --restart always \
   --name twitch-vods-caddy \
   --network twitch-vods-network \
@@ -536,7 +536,7 @@ docker run -d --restart always \
   -p 3000:3000 \
   caddy:2.6-alpine
 mkdir -p ~/docker/twitch-vods/twitch-vods-nginx
-cp ./nginx/dev/nginx.conf ~/docker/twitch-vods/twitch-vods-nginx
+cp ./proxy/nginx/dev/nginx.conf ~/docker/twitch-vods/twitch-vods-nginx
 docker run -d --restart always \
   --name twitch-vods-nginx \
   --network twitch-vods-network \
@@ -544,7 +544,7 @@ docker run -d --restart always \
   -p 4000:4000 \
   nginx:1.23
 mkdir -p ~/docker/twitch-vods/twitch-vods-haproxy
-cp ./haproxy/dev/haproxy.cfg ~/docker/twitch-vods/twitch-vods-haproxy
+cp ./proxy/haproxy/dev/haproxy.cfg ~/docker/twitch-vods/twitch-vods-haproxy
 docker run -d --restart always \
   --name twitch-vods-haproxy \
   --network twitch-vods-network \
@@ -786,14 +786,14 @@ docker run -d --restart always \
   --network host \
   twitch-vods-scraper
 mkdir -p ~/docker/twitch-vods/twitch-vods-caddy
-cp ./caddy/dev/Caddyfile ~/docker/twitch-vods/twitch-vods-caddy
+cp ./proxy/caddy/dev/Caddyfile ~/docker/twitch-vods/twitch-vods-caddy
 docker run -d --restart always \
   --name twitch-vods-caddy \
   --network host \
   -v ~/docker/twitch-vods/twitch-vods-caddy/Caddyfile:/etc/caddy/Caddyfile:ro \
   caddy:2.6-alpine
 mkdir -p ~/docker/twitch-vods/twitch-vods-nginx
-cp ./nginx/dev/nginx.conf ~/docker/twitch-vods/twitch-vods-nginx
+cp ./proxy/nginx/dev/nginx.conf ~/docker/twitch-vods/twitch-vods-nginx
 docker run -d --restart always \
   --name twitch-vods-nginx \
   --network host \
