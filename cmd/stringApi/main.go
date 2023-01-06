@@ -237,6 +237,10 @@ func (ch *CustomHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	port, ok := os.LookupEnv("PORT")
+	if !ok {
+		log.Fatal("PORT is missing to listen on")
+	}
 	databaseUrl, ok := os.LookupEnv("DATABASE_URL")
 	if !ok {
 		log.Fatal("DATABASE_URL is missing for db connection string")
@@ -275,7 +279,7 @@ func main() {
 	router.GET("/m3u8/:streamid/:unix/index.m3u8", makeM3U8Handler(ctx, queries))
 	router.GET("/language/:language/all/:pub-status/:sub-status", makeAllLanguageHandler(ctx, queries))
 	router.GET("/category/:game-id/all/:pub-status/:sub-status", makeAllCategoryHandler(ctx, queries))
-	fmt.Println("Serving on port :3000")
+	fmt.Println(fmt.Sprint("Serving on port :", port))
 
-	http.ListenAndServe(":3000", handler)
+	http.ListenAndServe(fmt.Sprint(":", port), handler)
 }

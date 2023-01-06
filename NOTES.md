@@ -519,6 +519,7 @@ migrate -source file://sqlc/migrations -database $POSTGRES_DB up
 docker run -d --restart always \
   --name twitch-vods-string-api \
   -e DATABASE_URL=$DOCKER_POSTGRES_DB \
+  -e PORT=3000 \
   -e CLIENT_URL="*" \
   --network twitch-vods-network \
   twitch-vods-string-api
@@ -666,10 +667,18 @@ An actual bound for a single process `ulimit -Sn`. On my PC, this is `524288`.
 This equals `2^19`. This is the maximum [number](https://unix.stackexchange.com/questions/447583/ulimit-vs-file-max) of file descriptors for a process.
 
 Right now I'm running a Caddy container as a reverse proxy to a single string-api container.
-From the discussion above, there can be at most `28322` concurrent connections from Caddy to the server. To increase this, you would increase the number of servers and use Caddy as a load balancer with round-robin distribution (or something). So adding 20 server containers would establish a an upper bound of `20 * 28322 = 566440` concurrent connections (this is if we choose not to increase the number of ephemeral ports in each server container and in the caddy container).
+From the discussion above, there can be at most `28322` concurrent connections from Caddy to the server. To increase this, you would increase the number of servers and use Caddy as a load balancer with round-robin distribution (or something). So adding 20 server containers would establish a an upper bound of `20 * 28322 = 566440` concurrent connections (this is if we choose not to increase the number of ephemeral ports in the caddy container).
 In the Caddy container, we have `ulimit -Sn = 1048576 = 2^20`.
 At that point, the value `2^20 / 2 = 524288` would be the new upper bound of connections.
 We divide by two because the proxy maintains a connection to the client and a connection to the server. So each client that Caddy maintains adds two sockets to the process.
+
+```bash
+docker run --rm -it \
+  --name twitch-vods-ubuntu \
+  --sysctl net.ipv4.ip_local_port_range="1024 65535" \
+  --network twitch-vods-network \
+  ubuntu:22.04
+```
 
 Rather than running a bunch of api docker containers,
 just have the API server [listen](https://news.ycombinator.com/item?id=21223677) on 20 ports.
@@ -773,6 +782,9 @@ To setup Docker, Caddy, and Cloudflare, see [here](https://caddy.community/t/set
 See [here](https://samjmck.com/en/blog/using-caddy-with-cloudflare/) to setup authenticated origin pulls.
 To tune performance, see [here](https://news.ycombinator.com/item?id=32865497).
 
+Authenticated origin pulls basically prevent people other than Cloudflare from making requests to your server. See [here](https://caddy.community/t/refuse-anyone-except-cdn-caching-server-to-access-my-server/5598/5).
+If a website has improperly configured Cloudflare, it might be possible to scan the entire IPv4 address space with something like `zmap`.
+
 Caddy's memory usage is absurdly high compared to NGINX.
 See [here](https://github.com/caddyserver/caddy/issues/3834) for some cool graphs.
 
@@ -814,6 +826,7 @@ migrate -source file://sqlc/migrations -database $DOCKER_POSTGERS_DB up
 docker run -d --restart always \
   --name twitch-vods-string-api \
   -e DATABASE_URL=$DOCKER_POSTGRES_DB \
+  -e PORT=3000 \
   -e CLIENT_URL="*" \
   --network host \
   twitch-vods-string-api
@@ -865,6 +878,15 @@ sudo perf script -i perf.data | ./stackcollapse-perf.pl > out.perf-folded
 Overall, using the host network reduces the overhead.
 But it easier to develop with a bridge network.
 For convenience, I will continue to use the bridge network.
+
+## Remote
+
+```bash
+# REMOTE=root@remote_ip_address
+ssh $REMOTE
+# install docker on remote
+
+```
 
 ## TODO
 
