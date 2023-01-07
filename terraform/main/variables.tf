@@ -4,6 +4,11 @@ variable "cloudflare_api_token" {
   sensitive   = true
 }
 
+variable "cloudflare_account_id" {
+  description = "Cloudflare account ID"
+  type = string
+}
+
 variable "domain_name" {
   description = "Domain name for the website (e.g. example.com)"
   type        = string

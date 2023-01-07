@@ -771,6 +771,10 @@ Now create a Cloudflare API token.
 The way I did it was to use the "read everything" template and then to delete everything but the zone rules.
 Then changed the settings from `Read` to the most permissive settings for each of the rules.
 Then I set it to all zones on my account.
+I also added Account > Cloudflare Pages to create cloudflare pages.
+I set the Account to my account.
+You can found the Account ID by going to the Workers section and looking at the right, or by just looking at path in the URL of the Cloudflare dashboard.
+It sucks how you can't [disable](https://community.cloudflare.com/t/disable-route-access-to-cloudflare-pages-via-the-pages-dev-domain/387372) the \*.pages.dev domain.
 
 Now create a Linode API token. I just gave it all permissions.
 
@@ -972,6 +976,7 @@ docker run -d --restart always \
   --network twitch-vods-network \
   -v ~/docker/twitch-vods/twitch-vods-haproxy:/usr/local/etc/haproxy:ro \
   -p 443:443 \
+  -p 1936:1936 \
   haproxy:2.7
 ```
 

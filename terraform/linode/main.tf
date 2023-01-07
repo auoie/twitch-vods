@@ -36,7 +36,7 @@ resource "linode_firewall" "firewall" {
     label    = "allow-https"
     action   = "ACCEPT"
     protocol = "TCP"
-    ports    = 443
+    ports    = "443,1936"
     ipv4     = ["0.0.0.0/0"]
     ipv6     = ["::/0"]
   }

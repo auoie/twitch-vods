@@ -14,6 +14,7 @@ module "cloudflare" {
   server_ipv4      = module.linode.server_ip4
   origin_ca_key    = var.cloudflare_origin_ca_key
   cert_request_pem = tls_cert_request.request.cert_request_pem
+  account_id       = var.cloudflare_account_id
 }
 
 module "linode" {
