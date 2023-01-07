@@ -1,10 +1,12 @@
 /.vscode/
-/caddy/
 /docker/
+/proxy/
 /sqlc/
 /terraform/
 *.md
 *.yml
 *.yaml
 *.prisma
+.env
+.gitignore
 LICENSE

@@ -5,3 +5,4 @@ migration_lock.toml
 .terraform/
 *.tfstate
 *.tfstate.backup
+*.pem

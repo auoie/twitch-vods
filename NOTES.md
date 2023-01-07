@@ -879,6 +879,23 @@ Overall, using the host network reduces the overhead.
 But it easier to develop with a bridge network.
 For convenience, I will continue to use the bridge network.
 
+## Haproxy with Authenticated Origin Pulls
+
+See [here](https://serverok.in/enable-ssl-in-haproxy-docker-container) to volume mount the PEM files.
+See the section _TLS termination_ of _Load Balancing with Haproxy_ by Nick Ramirez for notes on how to create the file `cert.pem`.
+Basically, get the output of my `terraform output`.
+See [here](https://www.leowkahman.com/2016/05/08/setup-haproxy-cloudflare-ssl-termination-openwrt/) for a HAProxy configuration file with Cloudflare Authenticated Origin Pulls.
+See [here](https://samjmck.com/en/blog/using-caddy-with-cloudflare/) for really good notes on setting it up with Caddy.
+
+For making `cert.pem`, basically have a file with the Cloudflare Origin CA Certificate followed by the private key used to create it.
+Also get the file `authenticated_origin_pull_ca.pem` linked in [the docs](https://developers.cloudflare.com/ssl/origin-configuration/authenticated-origin-pull/set-up/).
+
+For discussion on verifying that it works, see [here](https://caddy.community/t/refuse-anyone-except-cdn-caching-server-to-access-my-server/5598/3) and [here](https://serverfault.com/questions/443949/how-to-test-a-https-url-with-a-given-ip-address). Basically, run
+
+```bash
+curl --insecure https://$DOMAIN/channels/@xqc --resolve "$DOMAIN:443:$REMOTE_ADDRESS"
+```
+
 ## Deployment
 
 I keep getting segmentation faults.
@@ -905,7 +922,7 @@ Here is how to set things up:
 ssh $REMOTE
 # install docker and golang-migrate on remote
 docker pull postgres:15
-docker pull caddy:2.6-alpine
+docker pull haproxy:2.7
 mkdir -p ~/docker/twitch-vods/images
 # back in local
 mkdir -p ~/docker/twitch-vods/images
@@ -918,9 +935,11 @@ docker load -i ~/docker/twitch-vods/images/twitch-vods-string-api.tar
 docker network create twitch-vods-network
 mkdir -p ~/docker/twitch-vods/twitch-vods-db/app
 mkdir -p ~/docker/twitch-vods/twitch-vods-db/data
-# back in local, rsync migrations into remote
+mkdir -p ~/docker/twitch-vods/twitch-vods-haproxy
+# back in local, make cert.pem and get authenticated_origin_pull_ca.pem, rsync migrations and config into remote
 sudo cp -r sqlc/migrations ~/docker/twitch-vods/twitch-vods-db/app
 rsync -avzhP --compress-choice=zstd --compress-level=1 --checksum-choice=xxh3 ~/docker/twitch-vods/twitch-vods-db/app/ $REMOTE:docker/twitch-vods/twitch-vods-db/app/
+rsync -avzhP --compress-choice=zstd --compress-level=1 --checksum-choice=xxh3 ./proxy/haproxy/prod/ $REMOTE:docker/twitch-vods/twitch-vods-haproxy/
 ssh $REMOTE # back in remote, just run the docker containers
 # set PASSWORD env variable
 DOCKER_POSTGRES_DB="postgresql://twitch-vods-admin:$PASSWORD@twitch-vods-db:5432/twitch-vods"
@@ -947,6 +966,13 @@ docker run -d --restart always \
   -e DATABASE_URL=$DOCKER_POSTGRES_DB \
   --network twitch-vods-network \
   twitch-vods-scraper
+cp ./proxy/haproxy/dev/haproxy.cfg ~/docker/twitch-vods/twitch-vods-haproxy
+docker run -d --restart always \
+  --name twitch-vods-haproxy \
+  --network twitch-vods-network \
+  -v ~/docker/twitch-vods/twitch-vods-haproxy:/usr/local/etc/haproxy:ro \
+  -p 443:443 \
+  haproxy:2.7
 ```
 
 ## TODO

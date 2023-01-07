@@ -48,21 +48,21 @@ resource "cloudflare_zone" "zone" {
   zone = var.domain_name
 }
 
-resource "cloudflare_record" "www" {
-  zone_id = cloudflare_zone.zone.id
-  name    = "www"
-  value   = var.domain_name
-  type    = "CNAME"
-  proxied = true
-}
+# resource "cloudflare_record" "www" {
+#   zone_id = cloudflare_zone.zone.id
+#   name    = "www"
+#   value   = var.domain_name
+#   type    = "CNAME"
+#   proxied = true
+# }
 
-resource "cloudflare_record" "root" {
-  zone_id = cloudflare_zone.zone.id
-  name    = var.domain_name
-  value   = var.server_ipv4
-  type    = "A"
-  proxied = true
-}
+# resource "cloudflare_record" "root" {
+#   zone_id = cloudflare_zone.zone.id
+#   name    = var.domain_name
+#   value   = var.server_ipv4
+#   type    = "A"
+#   proxied = true
+# }
 
 resource "cloudflare_record" "api" {
   zone_id = cloudflare_zone.zone.id
@@ -92,4 +92,9 @@ resource "cloudflare_zone_settings_override" "site-settings" {
 resource "cloudflare_authenticated_origin_pulls" "aop" {
   zone_id = cloudflare_zone.zone.id
   enabled = true
+}
+
+output "cloudflare_origin_ca_certificate" {
+  description = "Cloudflare's origin certificate"
+  value       = cloudflare_origin_ca_certificate.origin_certificate.certificate
 }

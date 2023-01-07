@@ -21,3 +21,12 @@ module "linode" {
   api_token  = var.linode_api_token
   ip_address = var.ip_address
 }
+
+output "certificate" {
+  value = module.cloudflare.cloudflare_origin_ca_certificate
+}
+
+output "key" {
+  sensitive = true
+  value     = tls_cert_request.request.private_key_pem
+}

@@ -216,6 +216,7 @@ func makeM3U8Handler(ctx context.Context, queries *sqlvods.Queries) httprouter.H
 			return
 		}
 		w.Header().Set("Content-Length", strconv.Itoa(len(bytes)))
+		w.Header().Set("Content-Type", "application/x-mpegURL")
 		w.Header().Set("Content-Encoding", "gzip")
 		w.Write(bytes)
 	}
