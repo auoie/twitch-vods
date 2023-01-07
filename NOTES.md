@@ -879,13 +879,74 @@ Overall, using the host network reduces the overhead.
 But it easier to develop with a bridge network.
 For convenience, I will continue to use the bridge network.
 
-## Remote
+## Deployment
+
+I keep getting segmentation faults.
+I got rid of the `go-libdeflate` dependency so that I could compile with `CGO_ENABLED=0`.
+Now I'm getting
+
+```text
+fatal error: unexpected signal during runtime execution
+fatal error: unexpected signal during runtime execution
+[signal SIGSEGV: segmentation violation code=0x1 addr=0x63 pc=0x7fe9b8bf8298]
+```
+
+See [here](https://github.com/golang/go/issues/30310) to resolve it.
+Basically, just set `GODEBUG=netdns=go` at runtime.
+Alternatively, set `-tag gonet` at buildtime.
+To make a build fully static, see [here](https://news.ycombinator.com/item?id=22296801).
+See [here](https://www.dimoulis.net/posts/static-compilation-of-go-programs/) for some exposition.
+I guess see [here](https://medium.com/@diogok/on-golang-static-binaries-cross-compiling-and-plugins-1aed33499671) for some more exposition.
+
+Here is how to set things up:
 
 ```bash
 # REMOTE=root@remote_ip_address
 ssh $REMOTE
-# install docker on remote
-
+# install docker and golang-migrate on remote
+docker pull postgres:15
+docker pull caddy:2.6-alpine
+mkdir -p ~/docker/twitch-vods/images
+# back in local
+mkdir -p ~/docker/twitch-vods/images
+docker save -o ~/docker/twitch-vods/images/twitch-vods-scraper.tar twitch-vods-scraper:latest
+docker save -o ~/docker/twitch-vods/images/twitch-vods-string-api.tar twitch-vods-string-api:latest
+rsync -avzhP --compress-choice=zstd --compress-level=1 --checksum-choice=xxh3 ~/docker/twitch-vods/images/ $REMOTE:docker/twitch-vods/images/
+ssh $REMOTE # back in remote
+docker load -i ~/docker/twitch-vods/images/twitch-vods-scraper.tar
+docker load -i ~/docker/twitch-vods/images/twitch-vods-string-api.tar
+docker network create twitch-vods-network
+mkdir -p ~/docker/twitch-vods/twitch-vods-db/app
+mkdir -p ~/docker/twitch-vods/twitch-vods-db/data
+# back in local, rsync migrations into remote
+sudo cp -r sqlc/migrations ~/docker/twitch-vods/twitch-vods-db/app
+rsync -avzhP --compress-choice=zstd --compress-level=1 --checksum-choice=xxh3 ~/docker/twitch-vods/twitch-vods-db/app/ $REMOTE:docker/twitch-vods/twitch-vods-db/app/
+ssh $REMOTE # back in remote, just run the docker containers
+# set PASSWORD env variable
+DOCKER_POSTGRES_DB="postgresql://twitch-vods-admin:$PASSWORD@twitch-vods-db:5432/twitch-vods"
+docker run -d --restart always \
+  --name twitch-vods-db \
+  -e POSTGRES_USER="twitch-vods-admin" \
+  -e POSTGRES_PASSWORD=$PASSWORD \
+  -e POSTGRES_DB="twitch-vods" \
+  -v ~/docker/twitch-vods/twitch-vods-db/data:/var/lib/postgresql/data \
+  -v ~/docker/twitch-vods/twitch-vods-db/app:/home/app \
+  --network twitch-vods-network \
+  postgres:15
+POSTGRES_DB="postgresql://twitch-vods-admin:$PASSWORD@$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' twitch-vods-db):5432/twitch-vods?sslmode=disable"
+migrate -source file://docker/twitch-vods/twitch-vods-db/app/migrations -database $POSTGRES_DB up
+docker run -d --restart always \
+  --name twitch-vods-string-api \
+  -e DATABASE_URL=$DOCKER_POSTGRES_DB \
+  -e PORT=3000 \
+  -e CLIENT_URL=$CLIENT_URL \
+  --network twitch-vods-network \
+  twitch-vods-string-api
+docker run -d --restart always \
+  --name twitch-vods-scraper \
+  -e DATABASE_URL=$DOCKER_POSTGRES_DB \
+  --network twitch-vods-network \
+  twitch-vods-scraper
 ```
 
 ## TODO
@@ -896,10 +957,6 @@ ssh $REMOTE
 - `pgx v4` uses too much memory. Migrate to `pgx v5`.
   `sqlc v16` is not compatible with `pgx v5`.
   Support has been merged into the main branch. I should build `sqlc` from source and set it to generate `pgx v5` code.
-- I'm using `go-libdeflate` which is using version 1.6 of `libdeflate`.
-  The latest version of `libdeflate` is 1.15
-  It caused [this issue](https://github.com/4kills/go-libdeflate/issues/13).
-  Either make a pull request or fork the project to update the version of `libdeflate` in `go-libdeflate`.
 - I'm maintaining an infinite for loop.
   I should check if all the goroutines are closed using some tool to inspect the program internals.
 - Maybe add some private API so that I can configure the client ID and set of cloudfront domains at runtime.

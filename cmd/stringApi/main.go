@@ -250,12 +250,7 @@ func main() {
 		log.Fatal("CLIENT_URL is missing for CORS")
 	}
 	ctx := context.Background()
-	config, err := pgxpool.ParseConfig(os.Getenv("DATABASE_URL"))
-	if err != nil {
-		log.Println(fmt.Sprint("DATABASE_URL ", databaseUrl, " was not parseable"))
-		log.Fatal(err)
-	}
-	conn, err := pgxpool.ConnectConfig(ctx, config)
+	conn, err := pgxpool.Connect(ctx, databaseUrl)
 	if err != nil {
 		log.Println(fmt.Sprint("failed to connect to ", databaseUrl, ": ", err))
 		log.Fatal(err)

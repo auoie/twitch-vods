@@ -704,6 +704,26 @@ func RunScraper(ctx context.Context, databaseUrl string, evictionRatio float64, 
 		waitVodQueue *waitVodsPriorityQueue
 	}
 	getInitialState := func(ctx context.Context) (*tInitialState, error) {
+		compressor, err := libdeflate.NewCompressorLevel(params.LibdeflateCompressionLevel)
+		if err != nil {
+			log.Println(fmt.Sprint("failed to create compressor: ", err))
+			return nil, err
+		}
+		_, err = getCompressedBytes([]byte("Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet."), &compressor)
+		compressor.Close()
+		if err != nil {
+			log.Println(fmt.Sprint("failed to compress: ", err))
+			return nil, err
+		}
+		testClient := makeRobustHttpClient(params.RequestTimeLimit)
+		resp, err := retryOnError(func() (*http.Response, error) {
+			return testClient.Get(vods.DOMAINS[0])
+		})
+		if err != nil {
+			log.Println(fmt.Sprint("failed to establish test connection to domain: ", err))
+			return nil, err
+		}
+		resp.Body.Close()
 		conn, err := pgxpool.Connect(ctx, databaseUrl)
 		if err != nil {
 			log.Println(fmt.Sprint("failed to connect to ", databaseUrl, ": ", err))
