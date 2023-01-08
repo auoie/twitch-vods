@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/auoie/twitchVods/sqlvods"
@@ -38,7 +39,7 @@ func makeMostViewedHandler(ctx context.Context, queries *sqlvods.Queries) httpro
 		results, err := queries.GetPopularLiveStreams(ctx, sqlvods.GetPopularLiveStreamsParams{
 			Public:  sql.NullBool{Bool: p.ByName("pub-status") == "public", Valid: true},
 			SubOnly: sql.NullBool{Bool: p.ByName("sub-status") == "sub", Valid: true},
-			Limit:   50,
+			Limit:   100,
 		})
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -78,7 +79,7 @@ func makeAllLanguageHandler(ctx context.Context, queries *sqlvods.Queries) httpr
 			LanguageAtStart: language,
 			Public:          sql.NullBool{Bool: p.ByName("pub-status") == "public", Valid: true},
 			SubOnly:         sql.NullBool{Bool: p.ByName("sub-status") == "sub", Valid: true},
-			Limit:           50,
+			Limit:           100,
 		})
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -118,7 +119,7 @@ func makeAllCategoryHandler(ctx context.Context, queries *sqlvods.Queries) httpr
 			GameIDAtStart: categoryId,
 			Public:        sql.NullBool{Bool: p.ByName("pub-status") == "public", Valid: true},
 			SubOnly:       sql.NullBool{Bool: p.ByName("sub-status") == "sub", Valid: true},
-			Limit:         50,
+			Limit:         100,
 		})
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -154,7 +155,7 @@ func makeStreamerHandler(ctx context.Context, queries *sqlvods.Queries) httprout
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		streams, err := queries.GetLatestStreamsFromStreamerLogin(ctx, sqlvods.GetLatestStreamsFromStreamerLoginParams{StreamerLoginAtStart: name, Limit: 50})
+		streams, err := queries.GetLatestStreamsFromStreamerLogin(ctx, sqlvods.GetLatestStreamsFromStreamerLoginParams{StreamerLoginAtStart: name, Limit: 100})
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
@@ -237,6 +238,23 @@ func (ch *CustomHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ch.router.ServeHTTP(w, r)
 }
 
+type LockValue[T any] struct {
+	value T
+	sync.RWMutex
+}
+
+func (lv *LockValue[T]) Get() T {
+	lv.RLock()
+	defer lv.RUnlock()
+	return lv.value
+}
+
+func (lv *LockValue[T]) Set(value T) {
+	lv.Lock()
+	defer lv.Unlock()
+	lv.value = value
+}
+
 func main() {
 	port, ok := os.LookupEnv("PORT")
 	if !ok {
@@ -265,6 +283,28 @@ func main() {
 	queries := sqlvods.New(conn)
 	router := httprouter.New()
 	handler := &CustomHandler{router: router, clientUrl: clientUrl}
+	categoriesLock := LockValue[[]*sqlvods.GetPopularCategoriesRow]{
+		RWMutex: sync.RWMutex{},
+	}
+	setPopularCategories := func() {
+		log.Println("Fetching categories")
+		categories, err := queries.GetPopularCategories(ctx, 200)
+		if err == nil {
+			categoriesLock.Set(categories)
+			log.Println("Set categories")
+		}
+	}
+	go func(ctx context.Context) {
+		interval := time.NewTicker(1 * time.Hour)
+		setPopularCategories()
+		for {
+			select {
+			case <-interval.C:
+				setPopularCategories()
+			case <-ctx.Done():
+			}
+		}
+	}(ctx)
 
 	// pub-status: either public or private
 	// sub-status: either sub or free
@@ -275,7 +315,18 @@ func main() {
 	router.GET("/m3u8/:streamid/:unix/index.m3u8", makeM3U8Handler(ctx, queries))
 	router.GET("/language/:language/all/:pub-status/:sub-status", makeAllLanguageHandler(ctx, queries))
 	router.GET("/category/:game-id/all/:pub-status/:sub-status", makeAllCategoryHandler(ctx, queries))
-	fmt.Println(fmt.Sprint("Serving on port :", port))
+	router.GET("/categories", func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+		popularCategories := categoriesLock.Get()
+		bytes, err := json.Marshal(popularCategories)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Length", strconv.Itoa(len(bytes)))
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(bytes)
+	})
+	log.Println(fmt.Sprint("Serving on port :", port))
 
 	http.ListenAndServe(fmt.Sprint(":", port), handler)
 }

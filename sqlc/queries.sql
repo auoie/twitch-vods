@@ -125,6 +125,26 @@ ORDER BY
   max_views DESC, id DESC
 LIMIT $4;
 
+-- name: GetPopularCategories :many
+WITH
+  categories AS
+(SELECT
+  COUNT(*) AS count, game_name_at_start, game_id_at_start
+FROM
+  streams
+WHERE
+  last_updated_at > NOW() - INTERVAL '1 day'
+GROUP BY
+  game_name_at_start, game_id_at_start)
+SELECT
+  *
+FROM
+  categories
+ORDER BY
+  count DESC
+LIMIT
+  $1;
+
 -- name: DeleteOldStreams :exec
 DELETE FROM streams
 WHERE 

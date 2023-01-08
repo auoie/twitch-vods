@@ -266,6 +266,53 @@ func (q *Queries) GetLatestStreamsFromStreamerLogin(ctx context.Context, arg Get
 	return items, nil
 }
 
+const getPopularCategories = `-- name: GetPopularCategories :many
+WITH
+  categories AS
+(SELECT
+  COUNT(*) AS count, game_name_at_start, game_id_at_start
+FROM
+  streams
+WHERE
+  last_updated_at > NOW() - INTERVAL '1 day'
+GROUP BY
+  game_name_at_start, game_id_at_start)
+SELECT
+  count, game_name_at_start, game_id_at_start
+FROM
+  categories
+ORDER BY
+  count DESC
+LIMIT
+  $1
+`
+
+type GetPopularCategoriesRow struct {
+	Count           int64
+	GameNameAtStart string
+	GameIDAtStart   string
+}
+
+func (q *Queries) GetPopularCategories(ctx context.Context, limit int32) ([]*GetPopularCategoriesRow, error) {
+	rows, err := q.db.Query(ctx, getPopularCategories, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*GetPopularCategoriesRow
+	for rows.Next() {
+		var i GetPopularCategoriesRow
+		if err := rows.Scan(&i.Count, &i.GameNameAtStart, &i.GameIDAtStart); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getPopularLiveStreams = `-- name: GetPopularLiveStreams :many
 SELECT
   id, max_views, start_time, streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start, is_mature_at_start, game_id_at_start, bytes_found, public, sub_only, hls_duration_seconds, box_art_url_at_start, profile_image_url_at_start
