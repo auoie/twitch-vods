@@ -300,6 +300,7 @@ func main() {
 			case <-interval.C:
 				setPopularCategories()
 			case <-ctx.Done():
+				return
 			}
 		}
 	}(ctx)
@@ -320,6 +321,7 @@ func main() {
 			case <-interval.C:
 				setLanguages()
 			case <-ctx.Done():
+				return
 			}
 		}
 	}(ctx)
