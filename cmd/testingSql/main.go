@@ -7,8 +7,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/auoie/twitchVods/scraper"
-	"github.com/auoie/twitchVods/sqlvods"
+	"github.com/auoie/twitch-vods/scraper"
+	"github.com/auoie/twitch-vods/sqlvods"
 	"github.com/jackc/pgx/v4/pgxpool"
 )
 

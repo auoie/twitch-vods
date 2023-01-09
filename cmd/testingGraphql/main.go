@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/Khan/genqlient/graphql"
-	"github.com/auoie/twitchVods/twitchgql"
+	"github.com/auoie/twitch-vods/twitchgql"
 )
 
 func runForever(graphqlClient graphql.Client) error {

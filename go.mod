@@ -1,4 +1,4 @@
-module github.com/auoie/twitchVods
+module github.com/auoie/twitch-vods
 
 go 1.19
 

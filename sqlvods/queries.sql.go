@@ -84,6 +84,50 @@ func (q *Queries) GetEverything(ctx context.Context) ([]*Stream, error) {
 	return items, nil
 }
 
+const getLanguages = `-- name: GetLanguages :many
+WITH
+  languages AS 
+(SELECT 
+  COUNT(*) AS count, language_at_start 
+FROM
+  streams
+WHERE
+  last_updated_at > NOW() - INTERVAL '1 day'
+GROUP BY
+  language_at_start)
+SELECT
+  count, language_at_start
+FROM
+  languages
+ORDER BY
+  count DESC
+`
+
+type GetLanguagesRow struct {
+	Count           int64
+	LanguageAtStart string
+}
+
+func (q *Queries) GetLanguages(ctx context.Context) ([]*GetLanguagesRow, error) {
+	rows, err := q.db.Query(ctx, getLanguages)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*GetLanguagesRow
+	for rows.Next() {
+		var i GetLanguagesRow
+		if err := rows.Scan(&i.Count, &i.LanguageAtStart); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getLatestLiveStreams = `-- name: GetLatestLiveStreams :many
 SELECT
   id, stream_id, streamer_id, streamer_login_at_start, start_time, max_views, last_updated_at

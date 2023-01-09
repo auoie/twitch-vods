@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/auoie/twitchVods/sqlvods"
+	"github.com/auoie/twitch-vods/sqlvods"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/julienschmidt/httprouter"
 )
@@ -283,9 +283,7 @@ func main() {
 	queries := sqlvods.New(conn)
 	router := httprouter.New()
 	handler := &CustomHandler{router: router, clientUrl: clientUrl}
-	categoriesLock := LockValue[[]*sqlvods.GetPopularCategoriesRow]{
-		RWMutex: sync.RWMutex{},
-	}
+	categoriesLock := LockValue[[]*sqlvods.GetPopularCategoriesRow]{}
 	setPopularCategories := func() {
 		log.Println("Fetching categories")
 		categories, err := queries.GetPopularCategories(ctx, 200)
@@ -305,6 +303,26 @@ func main() {
 			}
 		}
 	}(ctx)
+	languagesLock := LockValue[[]*sqlvods.GetLanguagesRow]{}
+	setLanguages := func() {
+		log.Println("Fetching languages")
+		languages, err := queries.GetLanguages(ctx)
+		if err == nil {
+			languagesLock.Set(languages)
+			log.Println("Set languages")
+		}
+	}
+	go func(ctx context.Context) {
+		interval := time.NewTicker(1 * time.Hour)
+		setLanguages()
+		for {
+			select {
+			case <-interval.C:
+				setLanguages()
+			case <-ctx.Done():
+			}
+		}
+	}(ctx)
 
 	// pub-status: either public or private
 	// sub-status: either sub or free
@@ -318,6 +336,17 @@ func main() {
 	router.GET("/categories", func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		popularCategories := categoriesLock.Get()
 		bytes, err := json.Marshal(popularCategories)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Length", strconv.Itoa(len(bytes)))
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(bytes)
+	})
+	router.GET("/languages", func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+		popularLanguages := languagesLock.Get()
+		bytes, err := json.Marshal(popularLanguages)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			return

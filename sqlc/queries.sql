@@ -145,6 +145,24 @@ ORDER BY
 LIMIT
   $1;
 
+-- name: GetLanguages :many
+WITH
+  languages AS 
+(SELECT 
+  COUNT(*) AS count, language_at_start 
+FROM
+  streams
+WHERE
+  last_updated_at > NOW() - INTERVAL '1 day'
+GROUP BY
+  language_at_start)
+SELECT
+  *
+FROM
+  languages
+ORDER BY
+  count DESC;
+
 -- name: DeleteOldStreams :exec
 DELETE FROM streams
 WHERE 

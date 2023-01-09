@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/auoie/twitchVods/scraper"
+	"github.com/auoie/twitch-vods/scraper"
 )
 
 func main() {
