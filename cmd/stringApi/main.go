@@ -283,7 +283,8 @@ func (lv *LockValue[T]) Set(value T) {
 	lv.value = value
 }
 
-func main() {
+func initApp(ctx context.Context) (string, *sqlvods.Queries, *httprouter.Router, *CustomHandler) {
+	// init app
 	port, ok := os.LookupEnv("PORT")
 	if !ok {
 		log.Fatal("PORT is missing to listen on")
@@ -296,7 +297,6 @@ func main() {
 	if !ok {
 		log.Fatal("CLIENT_URL is missing for CORS")
 	}
-	ctx := context.Background()
 	conn, err := pgxpool.Connect(ctx, databaseUrl)
 	if err != nil {
 		log.Println(fmt.Sprint("failed to connect to ", databaseUrl, ": ", err))
@@ -311,6 +311,14 @@ func main() {
 	queries := sqlvods.New(conn)
 	router := httprouter.New()
 	handler := &CustomHandler{router: router, clientUrl: clientUrl}
+	return port, queries, router, handler
+}
+
+func main() {
+	ctx := context.Background()
+	port, queries, router, handler := initApp(ctx)
+
+	// should use rabbitmq or apache kafka instead of polling every hour
 	categoriesLock := &LockValue[[]*sqlvods.GetPopularCategoriesRow]{}
 	setPopularCategories := func() {
 		log.Println("Fetching categories")
