@@ -34,24 +34,80 @@ func bongHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	w.Write([]byte("bong"))
 }
 
-func marshalJsonAndWriteBodyPlusHeaders[T any](w http.ResponseWriter, streamResults []TStreamResult[T]) {
-	bytes, err := json.Marshal(streamResults)
+func resultsGetPopularLiveStreams(ctx context.Context, w http.ResponseWriter, p httprouter.Params, queries *sqlvods.Queries) ([]*sqlvods.GetPopularLiveStreamsRow, error, bool) {
+	results, err := queries.GetPopularLiveStreams(ctx, sqlvods.GetPopularLiveStreamsParams{
+		Public:  sql.NullBool{Bool: p.ByName("pub-status") == "public", Valid: true},
+		SubOnly: sql.NullBool{Bool: p.ByName("sub-status") == "sub", Valid: true},
+		Limit:   50,
+	})
+	return results, err, false
+}
+func linkGetPopularLiveStreams(stream *sqlvods.GetPopularLiveStreamsRow) string {
+	return fmt.Sprint("/m3u8/", stream.StreamID, "/", stream.StartTime.Unix(), "/index.m3u8")
+}
+
+func resultsGetPopularLiveStreamsByLanguage(ctx context.Context, w http.ResponseWriter, p httprouter.Params, queries *sqlvods.Queries) ([]*sqlvods.GetPopularLiveStreamsByLanguageRow, error, bool) {
+	language, err := parseParam(p.ByName("language"))
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+		w.WriteHeader(http.StatusBadRequest)
+		return nil, nil, true
 	}
-	w.Header().Set("Content-Length", strconv.Itoa(len(bytes)))
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(bytes)
+	results, err := queries.GetPopularLiveStreamsByLanguage(ctx, sqlvods.GetPopularLiveStreamsByLanguageParams{
+		LanguageAtStart: language,
+		Public:          sql.NullBool{Bool: p.ByName("pub-status") == "public", Valid: true},
+		SubOnly:         sql.NullBool{Bool: p.ByName("sub-status") == "sub", Valid: true},
+		Limit:           50,
+	})
+	return results, err, false
+}
+func linkGetPopularLiveStreamsByLanguage(stream *sqlvods.GetPopularLiveStreamsByLanguageRow) string {
+	return fmt.Sprint("/m3u8/", stream.StreamID, "/", stream.StartTime.Unix(), "/index.m3u8")
 }
 
-func makeMostViewedHandler(ctx context.Context, queries *sqlvods.Queries) httprouter.Handle {
+func resultsGetPopularLiveStreamsByGameId(ctx context.Context, w http.ResponseWriter, p httprouter.Params, queries *sqlvods.Queries) ([]*sqlvods.GetPopularLiveStreamsByGameIdRow, error, bool) {
+	categoryId, err := parseParam(p.ByName("game-id"))
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return nil, nil, true
+	}
+	results, err := queries.GetPopularLiveStreamsByGameId(ctx, sqlvods.GetPopularLiveStreamsByGameIdParams{
+		GameIDAtStart: categoryId,
+		Public:        sql.NullBool{Bool: p.ByName("pub-status") == "public", Valid: true},
+		SubOnly:       sql.NullBool{Bool: p.ByName("sub-status") == "sub", Valid: true},
+		Limit:         50,
+	})
+	return results, err, false
+}
+func linkGetPopularLiveStreamsByGameId(stream *sqlvods.GetPopularLiveStreamsByGameIdRow) string {
+	return fmt.Sprint("/m3u8/", stream.StreamID, "/", stream.StartTime.Unix(), "/index.m3u8")
+}
+
+func resultsGetLatestStreamsFromStreamerLogin(ctx context.Context, w http.ResponseWriter, p httprouter.Params, queries *sqlvods.Queries) ([]*sqlvods.GetLatestStreamsFromStreamerLoginRow, error, bool) {
+	name, err := parseParam(p.ByName("streamer"))
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return nil, nil, true
+	}
+	results, err := queries.GetLatestStreamsFromStreamerLogin(ctx, sqlvods.GetLatestStreamsFromStreamerLoginParams{
+		StreamerLoginAtStart: name,
+		Limit:                50,
+	})
+	return results, err, false
+}
+func linkGetLatestStreamsFromStreamerLogin(stream *sqlvods.GetLatestStreamsFromStreamerLoginRow) string {
+	return fmt.Sprint("/m3u8/", stream.StreamID, "/", stream.StartTime.Unix(), "/index.m3u8")
+}
+
+func makeListHandler[T any](
+	ctx context.Context,
+	queries *sqlvods.Queries,
+	getResults func(context.Context, http.ResponseWriter, httprouter.Params, *sqlvods.Queries) ([]T, error, bool),
+	getLink func(T) string) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-		results, err := queries.GetPopularLiveStreams(ctx, sqlvods.GetPopularLiveStreamsParams{
-			Public:  sql.NullBool{Bool: p.ByName("pub-status") == "public", Valid: true},
-			SubOnly: sql.NullBool{Bool: p.ByName("sub-status") == "sub", Valid: true},
-			Limit:   50,
-		})
+		results, err, done := getResults(ctx, w, p, queries)
+		if done {
+			return
+		}
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
@@ -60,105 +116,21 @@ func makeMostViewedHandler(ctx context.Context, queries *sqlvods.Queries) httpro
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		streamResults := []TStreamResult[*sqlvods.GetPopularLiveStreamsRow]{}
+		streamResults := []TStreamResult[T]{}
 		for _, stream := range results {
-			streamResults = append(streamResults, TStreamResult[*sqlvods.GetPopularLiveStreamsRow]{
+			streamResults = append(streamResults, TStreamResult[T]{
 				Metadata: stream,
-				Link:     fmt.Sprint("/m3u8/", stream.StreamID, "/", stream.StartTime.Unix(), "/index.m3u8"),
+				Link:     getLink(stream),
 			})
 		}
-		marshalJsonAndWriteBodyPlusHeaders(w, streamResults)
-	}
-}
-
-func makeAllLanguageHandler(ctx context.Context, queries *sqlvods.Queries) httprouter.Handle {
-	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-		language, err := parseParam(p.ByName("language"))
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		results, err := queries.GetPopularLiveStreamsByLanguage(ctx, sqlvods.GetPopularLiveStreamsByLanguageParams{
-			LanguageAtStart: language,
-			Public:          sql.NullBool{Bool: p.ByName("pub-status") == "public", Valid: true},
-			SubOnly:         sql.NullBool{Bool: p.ByName("sub-status") == "sub", Valid: true},
-			Limit:           50,
-		})
+		bytes, err := json.Marshal(streamResults)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		if len(results) == 0 {
-			w.WriteHeader(http.StatusNotFound)
-			return
-		}
-		streamResults := []TStreamResult[*sqlvods.GetPopularLiveStreamsByLanguageRow]{}
-		for _, stream := range results {
-			streamResults = append(streamResults, TStreamResult[*sqlvods.GetPopularLiveStreamsByLanguageRow]{
-				Metadata: stream,
-				Link:     fmt.Sprint("/m3u8/", stream.StreamID, "/", stream.StartTime.Unix(), "/index.m3u8"),
-			})
-		}
-		marshalJsonAndWriteBodyPlusHeaders(w, streamResults)
-	}
-}
-
-func makeAllCategoryHandler(ctx context.Context, queries *sqlvods.Queries) httprouter.Handle {
-	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-		categoryId, err := parseParam(p.ByName("game-id"))
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		results, err := queries.GetPopularLiveStreamsByGameId(ctx, sqlvods.GetPopularLiveStreamsByGameIdParams{
-			GameIDAtStart: categoryId,
-			Public:        sql.NullBool{Bool: p.ByName("pub-status") == "public", Valid: true},
-			SubOnly:       sql.NullBool{Bool: p.ByName("sub-status") == "sub", Valid: true},
-			Limit:         50,
-		})
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		if len(results) == 0 {
-			w.WriteHeader(http.StatusNotFound)
-			return
-		}
-		streamResults := []TStreamResult[*sqlvods.GetPopularLiveStreamsByGameIdRow]{}
-		for _, stream := range results {
-			streamResults = append(streamResults, TStreamResult[*sqlvods.GetPopularLiveStreamsByGameIdRow]{
-				Metadata: stream,
-				Link:     fmt.Sprint("/m3u8/", stream.StreamID, "/", stream.StartTime.Unix(), "/index.m3u8"),
-			})
-		}
-		marshalJsonAndWriteBodyPlusHeaders(w, streamResults)
-	}
-}
-
-func makeStreamerHandler(ctx context.Context, queries *sqlvods.Queries) httprouter.Handle {
-	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-		name, err := parseParam(p.ByName("streamer"))
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		streams, err := queries.GetLatestStreamsFromStreamerLogin(ctx, sqlvods.GetLatestStreamsFromStreamerLoginParams{StreamerLoginAtStart: name, Limit: 50})
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		if len(streams) == 0 {
-			w.WriteHeader(http.StatusNotFound)
-			return
-		}
-		streamResults := []TStreamResult[*sqlvods.GetLatestStreamsFromStreamerLoginRow]{}
-		for _, stream := range streams {
-			streamResults = append(streamResults, TStreamResult[*sqlvods.GetLatestStreamsFromStreamerLoginRow]{
-				Metadata: stream,
-				Link:     fmt.Sprint("/m3u8/", stream.StreamID, "/", stream.StartTime.Unix(), "/index.m3u8"),
-			})
-		}
-		marshalJsonAndWriteBodyPlusHeaders(w, streamResults)
+		w.Header().Set("Content-Length", strconv.Itoa(len(bytes)))
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(bytes)
 	}
 }
 
@@ -263,7 +235,8 @@ func (lv *LockValue[T]) Set(value T) {
 	lv.value = value
 }
 
-func initApp(ctx context.Context) (string, *sqlvods.Queries, *httprouter.Router, *CustomHandler) {
+func main() {
+	ctx := context.Background()
 	// init app
 	port, ok := os.LookupEnv("PORT")
 	if !ok {
@@ -291,12 +264,6 @@ func initApp(ctx context.Context) (string, *sqlvods.Queries, *httprouter.Router,
 	queries := sqlvods.New(conn)
 	router := httprouter.New()
 	handler := &CustomHandler{router: router, clientUrl: clientUrl}
-	return port, queries, router, handler
-}
-
-func main() {
-	ctx := context.Background()
-	port, queries, router, handler := initApp(ctx)
 
 	// should use rabbitmq or apache kafka instead of polling every hour
 	categoriesLock := &LockValue[[]*sqlvods.GetPopularCategoriesRow]{}
@@ -350,13 +317,13 @@ func main() {
 	// sub-status: either sub or free
 	router.GET("/", okHandler)
 	router.GET("/bing", bongHandler)
-	router.GET("/all/:pub-status/:sub-status", makeMostViewedHandler(ctx, queries))
-	router.GET("/channels/:streamer", makeStreamerHandler(ctx, queries))
-	router.GET("/m3u8/:streamid/:unix/index.m3u8", makeM3U8Handler(ctx, queries))
-	router.GET("/language/:language/all/:pub-status/:sub-status", makeAllLanguageHandler(ctx, queries))
-	router.GET("/category/:game-id/all/:pub-status/:sub-status", makeAllCategoryHandler(ctx, queries))
+	router.GET("/all/:pub-status/:sub-status", makeListHandler(ctx, queries, resultsGetPopularLiveStreams, linkGetPopularLiveStreams))
+	router.GET("/language/:language/all/:pub-status/:sub-status", makeListHandler(ctx, queries, resultsGetPopularLiveStreamsByLanguage, linkGetPopularLiveStreamsByLanguage))
+	router.GET("/category/:game-id/all/:pub-status/:sub-status", makeListHandler(ctx, queries, resultsGetPopularLiveStreamsByGameId, linkGetPopularLiveStreamsByGameId))
+	router.GET("/channels/:streamer", makeListHandler(ctx, queries, resultsGetLatestStreamsFromStreamerLogin, linkGetLatestStreamsFromStreamerLogin))
 	router.GET("/categories", makeCategoriesListHandler(categoriesLock))
 	router.GET("/languages", makeLanguagesListHandler(languagesLock))
+	router.GET("/m3u8/:streamid/:unix/index.m3u8", makeM3U8Handler(ctx, queries))
 	log.Println(fmt.Sprint("Serving on port :", port))
 
 	http.ListenAndServe(fmt.Sprint(":", port), handler)
