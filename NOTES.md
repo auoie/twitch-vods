@@ -529,7 +529,7 @@ docker run -d --restart always \
   --network twitch-vods-network \
   twitch-vods-scraper
 mkdir -p ~/docker/twitch-vods/twitch-vods-caddy
-cp ./proxy/caddy/dev/Caddyfile ~/docker/twitch-vods/twitch-vods-caddy
+cp ./reverse-proxy/caddy/dev/Caddyfile ~/docker/twitch-vods/twitch-vods-caddy
 docker run -d --restart always \
   --name twitch-vods-caddy \
   --network twitch-vods-network \
@@ -537,7 +537,7 @@ docker run -d --restart always \
   -p 3000:3000 \
   caddy:2.6-alpine
 mkdir -p ~/docker/twitch-vods/twitch-vods-nginx
-cp ./proxy/nginx/dev/nginx.conf ~/docker/twitch-vods/twitch-vods-nginx
+cp ./reverse-proxy/nginx/dev/nginx.conf ~/docker/twitch-vods/twitch-vods-nginx
 docker run -d --restart always \
   --name twitch-vods-nginx \
   --network twitch-vods-network \
@@ -545,7 +545,7 @@ docker run -d --restart always \
   -p 4000:4000 \
   nginx:1.23
 mkdir -p ~/docker/twitch-vods/twitch-vods-haproxy
-cp ./proxy/haproxy/dev/haproxy.cfg ~/docker/twitch-vods/twitch-vods-haproxy
+cp ./reverse-proxy/haproxy/dev/haproxy.cfg ~/docker/twitch-vods/twitch-vods-haproxy
 docker run -d --restart always \
   --name twitch-vods-haproxy \
   --network twitch-vods-network \
@@ -840,14 +840,14 @@ docker run -d --restart always \
   --network host \
   twitch-vods-scraper
 mkdir -p ~/docker/twitch-vods/twitch-vods-caddy
-cp ./proxy/caddy/dev/Caddyfile ~/docker/twitch-vods/twitch-vods-caddy
+cp ./reverse-proxy/caddy/dev/Caddyfile ~/docker/twitch-vods/twitch-vods-caddy
 docker run -d --restart always \
   --name twitch-vods-caddy \
   --network host \
   -v ~/docker/twitch-vods/twitch-vods-caddy/Caddyfile:/etc/caddy/Caddyfile:ro \
   caddy:2.6-alpine
 mkdir -p ~/docker/twitch-vods/twitch-vods-nginx
-cp ./proxy/nginx/dev/nginx.conf ~/docker/twitch-vods/twitch-vods-nginx
+cp ./reverse-proxy/nginx/dev/nginx.conf ~/docker/twitch-vods/twitch-vods-nginx
 docker run -d --restart always \
   --name twitch-vods-nginx \
   --network host \
@@ -943,7 +943,7 @@ mkdir -p ~/docker/twitch-vods/twitch-vods-haproxy
 # back in local, make cert.pem and get authenticated_origin_pull_ca.pem, rsync migrations and config into remote
 sudo cp -r sqlc/migrations ~/docker/twitch-vods/twitch-vods-db/app
 rsync -avzhP --compress-choice=zstd --compress-level=1 --checksum-choice=xxh3 ~/docker/twitch-vods/twitch-vods-db/app/ $REMOTE:docker/twitch-vods/twitch-vods-db/app/
-rsync -avzhP --compress-choice=zstd --compress-level=1 --checksum-choice=xxh3 ./proxy/haproxy/prod/ $REMOTE:docker/twitch-vods/twitch-vods-haproxy/
+rsync -avzhP --compress-choice=zstd --compress-level=1 --checksum-choice=xxh3 ./reverse-proxy/haproxy/prod/ $REMOTE:docker/twitch-vods/twitch-vods-haproxy/
 ssh $REMOTE # back in remote, just run the docker containers
 # set PASSWORD env variable
 DOCKER_POSTGRES_DB="postgresql://twitch-vods-admin:$PASSWORD@twitch-vods-db:5432/twitch-vods"
@@ -970,7 +970,7 @@ docker run -d --restart always \
   -e DATABASE_URL=$DOCKER_POSTGRES_DB \
   --network twitch-vods-network \
   twitch-vods-scraper
-cp ./proxy/haproxy/dev/haproxy.cfg ~/docker/twitch-vods/twitch-vods-haproxy
+cp ./reverse-proxy/haproxy/dev/haproxy.cfg ~/docker/twitch-vods/twitch-vods-haproxy
 docker run -d --restart always \
   --name twitch-vods-haproxy \
   --network twitch-vods-network \
@@ -982,12 +982,9 @@ docker run -d --restart always \
 
 ## TODO
 
-- Use caddy as a reverse proxy. Don't use it to serve the static SPA. Just use some SAAS that does this.
-- Deploy with Terraform and cloudflare.
-  Use [Authenticated origin pulls](https://caddy.community/t/setting-up-cloudflare-with-caddy/13911/6) and the cloudflare [module](https://github.com/caddy-dns/cloudflare) for caddy.
-- `pgx v4` uses too much memory. Migrate to `pgx v5`.
-  `sqlc v16` is not compatible with `pgx v5`.
-  Support has been merged into the main branch. I should build `sqlc` from source and set it to generate `pgx v5` code.
+- Add infinite scroll, sort by recent, search for streamer name
+- Open issue in Sqlc to create methods for struct fields like in Genqlient
+- Open issue in go-libdeflate to use newer version of libdeflate
 - I'm maintaining an infinite for loop.
   I should check if all the goroutines are closed using some tool to inspect the program internals.
 - Maybe add some private API so that I can configure the client ID and set of cloudfront domains at runtime.
