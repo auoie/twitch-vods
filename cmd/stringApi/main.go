@@ -34,6 +34,17 @@ func bongHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	w.Write([]byte("bong"))
 }
 
+func marshalJsonAndWriteBodyPlusHeaders[T any](w http.ResponseWriter, streamResults []TStreamResult[T]) {
+	bytes, err := json.Marshal(streamResults)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Length", strconv.Itoa(len(bytes)))
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(bytes)
+}
+
 func makeMostViewedHandler(ctx context.Context, queries *sqlvods.Queries) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		results, err := queries.GetPopularLiveStreams(ctx, sqlvods.GetPopularLiveStreamsParams{
@@ -49,22 +60,14 @@ func makeMostViewedHandler(ctx context.Context, queries *sqlvods.Queries) httpro
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		streamResults := []TStreamResult{}
+		streamResults := []TStreamResult[*sqlvods.GetPopularLiveStreamsRow]{}
 		for _, stream := range results {
-			streamResults = append(streamResults, TStreamResult{
-				Metadata: (*sqlvods.GetLatestStreamsFromStreamerLoginRow)(stream),
-				Link: fmt.Sprint("/m3u8/", stream.StreamID, "/",
-					stream.StartTime.Unix(), "/index.m3u8"),
+			streamResults = append(streamResults, TStreamResult[*sqlvods.GetPopularLiveStreamsRow]{
+				Metadata: stream,
+				Link:     fmt.Sprint("/m3u8/", stream.StreamID, "/", stream.StartTime.Unix(), "/index.m3u8"),
 			})
 		}
-		bytes, err := json.Marshal(streamResults)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Length", strconv.Itoa(len(bytes)))
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(bytes)
+		marshalJsonAndWriteBodyPlusHeaders(w, streamResults)
 	}
 }
 
@@ -89,22 +92,14 @@ func makeAllLanguageHandler(ctx context.Context, queries *sqlvods.Queries) httpr
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		streamResults := []TStreamResult{}
+		streamResults := []TStreamResult[*sqlvods.GetPopularLiveStreamsByLanguageRow]{}
 		for _, stream := range results {
-			streamResults = append(streamResults, TStreamResult{
-				Metadata: (*sqlvods.GetLatestStreamsFromStreamerLoginRow)(stream),
-				Link: fmt.Sprint("/m3u8/", stream.StreamID, "/",
-					stream.StartTime.Unix(), "/index.m3u8"),
+			streamResults = append(streamResults, TStreamResult[*sqlvods.GetPopularLiveStreamsByLanguageRow]{
+				Metadata: stream,
+				Link:     fmt.Sprint("/m3u8/", stream.StreamID, "/", stream.StartTime.Unix(), "/index.m3u8"),
 			})
 		}
-		bytes, err := json.Marshal(streamResults)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Length", strconv.Itoa(len(bytes)))
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(bytes)
+		marshalJsonAndWriteBodyPlusHeaders(w, streamResults)
 	}
 }
 
@@ -129,22 +124,14 @@ func makeAllCategoryHandler(ctx context.Context, queries *sqlvods.Queries) httpr
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		streamResults := []TStreamResult{}
+		streamResults := []TStreamResult[*sqlvods.GetPopularLiveStreamsByGameIdRow]{}
 		for _, stream := range results {
-			streamResults = append(streamResults, TStreamResult{
-				Metadata: (*sqlvods.GetLatestStreamsFromStreamerLoginRow)(stream),
-				Link: fmt.Sprint("/m3u8/", stream.StreamID, "/",
-					stream.StartTime.Unix(), "/index.m3u8"),
+			streamResults = append(streamResults, TStreamResult[*sqlvods.GetPopularLiveStreamsByGameIdRow]{
+				Metadata: stream,
+				Link:     fmt.Sprint("/m3u8/", stream.StreamID, "/", stream.StartTime.Unix(), "/index.m3u8"),
 			})
 		}
-		bytes, err := json.Marshal(streamResults)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Length", strconv.Itoa(len(bytes)))
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(bytes)
+		marshalJsonAndWriteBodyPlusHeaders(w, streamResults)
 	}
 }
 
@@ -164,21 +151,14 @@ func makeStreamerHandler(ctx context.Context, queries *sqlvods.Queries) httprout
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		streamResults := []TStreamResult{}
+		streamResults := []TStreamResult[*sqlvods.GetLatestStreamsFromStreamerLoginRow]{}
 		for _, stream := range streams {
-			streamResults = append(streamResults, TStreamResult{
+			streamResults = append(streamResults, TStreamResult[*sqlvods.GetLatestStreamsFromStreamerLoginRow]{
 				Metadata: stream,
 				Link:     fmt.Sprint("/m3u8/", stream.StreamID, "/", stream.StartTime.Unix(), "/index.m3u8"),
 			})
 		}
-		bytes, err := json.Marshal(streamResults)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Length", strconv.Itoa(len(bytes)))
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(bytes)
+		marshalJsonAndWriteBodyPlusHeaders(w, streamResults)
 	}
 }
 
@@ -251,9 +231,9 @@ func makeLanguagesListHandler(languagesLock *LockValue[[]*sqlvods.GetLanguagesRo
 	}
 }
 
-type TStreamResult struct {
+type TStreamResult[T any] struct {
 	Link     string
-	Metadata *sqlvods.GetLatestStreamsFromStreamerLoginRow
+	Metadata T
 }
 
 type CustomHandler struct {
