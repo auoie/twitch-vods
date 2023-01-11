@@ -34,6 +34,7 @@ func bongHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	w.Write([]byte("bong"))
 }
 
+// It would be nice if SQLC created methods to access struct field like Genqlient
 func resultsGetPopularLiveStreams(ctx context.Context, w http.ResponseWriter, p httprouter.Params, queries *sqlvods.Queries) ([]*sqlvods.GetPopularLiveStreamsRow, error, bool) {
 	results, err := queries.GetPopularLiveStreams(ctx, sqlvods.GetPopularLiveStreamsParams{
 		Public:  sql.NullBool{Bool: p.ByName("pub-status") == "public", Valid: true},
