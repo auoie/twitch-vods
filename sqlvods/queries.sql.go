@@ -13,6 +13,17 @@ import (
 	"github.com/google/uuid"
 )
 
+const deleteOldStreamers = `-- name: DeleteOldStreamers :exec
+DELETE FROM streamers
+WHERE 
+  start_time < $1
+`
+
+func (q *Queries) DeleteOldStreamers(ctx context.Context, startTime time.Time) error {
+	_, err := q.db.Exec(ctx, deleteOldStreamers, startTime)
+	return err
+}
+
 const deleteOldStreams = `-- name: DeleteOldStreams :exec
 DELETE FROM streams
 WHERE 
@@ -300,6 +311,47 @@ func (q *Queries) GetLatestStreamsFromStreamerLogin(ctx context.Context, arg Get
 			&i.BoxArtUrlAtStart,
 			&i.ProfileImageUrlAtStart,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getMatchingStreamers = `-- name: GetMatchingStreamers :many
+SELECT
+  profile_image_url_at_start, streamer_login_at_start
+FROM
+  streamers
+WHERE
+  streamer_login_at_start ILIKE $1
+LIMIT
+  $2
+`
+
+type GetMatchingStreamersParams struct {
+	StreamerLoginAtStart string
+	Limit                int32
+}
+
+type GetMatchingStreamersRow struct {
+	ProfileImageUrlAtStart string
+	StreamerLoginAtStart   string
+}
+
+func (q *Queries) GetMatchingStreamers(ctx context.Context, arg GetMatchingStreamersParams) ([]*GetMatchingStreamersRow, error) {
+	rows, err := q.db.Query(ctx, getMatchingStreamers, arg.StreamerLoginAtStart, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*GetMatchingStreamersRow
+	for rows.Next() {
+		var i GetMatchingStreamersRow
+		if err := rows.Scan(&i.ProfileImageUrlAtStart, &i.StreamerLoginAtStart); err != nil {
 			return nil, err
 		}
 		items = append(items, &i)
@@ -675,6 +727,40 @@ func (q *Queries) UpdateRecording(ctx context.Context, arg UpdateRecordingParams
 		arg.Public,
 		arg.SubOnly,
 		arg.HlsDurationSeconds,
+	)
+	return err
+}
+
+const upsertManyStreamers = `-- name: UpsertManyStreamers :exec
+INSERT INTO
+  streamers (streamer_id, start_time, streamer_login_at_start, profile_image_url_at_start)
+SELECT
+  unnest($1::TEXT[]) AS streamer_id,
+  unnest($2::TIMESTAMP(3)[]) AS start_time,
+  unnest($3::TEXT[]) AS streamer_login_at_start,
+  unnest($4::TEXT[]) AS profile_image_url_at_start
+ON CONFLICT
+  (streamer_login_at_start)
+DO
+  UPDATE SET
+    streamer_id = EXCLUDED.streamer_id,
+    start_time = EXCLUDED.start_time,
+    profile_image_url_at_start = EXCLUDED.profile_image_url_at_start
+`
+
+type UpsertManyStreamersParams struct {
+	StreamerIDArr             []string
+	StartTimeArr              []time.Time
+	StreamerLoginAtStartArr   []string
+	ProfileImageUrlAtStartArr []string
+}
+
+func (q *Queries) UpsertManyStreamers(ctx context.Context, arg UpsertManyStreamersParams) error {
+	_, err := q.db.Exec(ctx, upsertManyStreamers,
+		arg.StreamerIDArr,
+		arg.StartTimeArr,
+		arg.StreamerLoginAtStartArr,
+		arg.ProfileImageUrlAtStartArr,
 	)
 	return err
 }

@@ -92,7 +92,7 @@ type fetchTwitchGqlForeverParams struct {
 	done                     chan struct{}
 }
 
-func twitchGqlResponseToSqlParams(
+func twitchGqlResponseUpsertStreamsParams(
 	streams []*twitchgql.GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStream,
 	responseReturnedTime time.Time,
 ) sqlvods.UpsertManyStreamsParams {
@@ -111,6 +111,19 @@ func twitchGqlResponseToSqlParams(
 		result.IsMatureAtStartArr = append(result.IsMatureAtStartArr, node.Broadcaster.BroadcastSettings.IsMature)
 		result.LastUpdatedMinusStartTimeSecondsArr = append(result.LastUpdatedMinusStartTimeSecondsArr, responseReturnedTime.Sub(node.CreatedAt.UTC()).Seconds())
 		result.BoxArtUrlAtStartAtStartArr = append(result.BoxArtUrlAtStartAtStartArr, node.Game.BoxArtURL)
+		result.ProfileImageUrlAtStartArr = append(result.ProfileImageUrlAtStartArr, node.Broadcaster.ProfileImageURL)
+	}
+	return result
+}
+
+func twitchGqlResponseUpsertStreamersParams(
+	streams []*twitchgql.GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStream,
+) sqlvods.UpsertManyStreamersParams {
+	result := sqlvods.UpsertManyStreamersParams{}
+	for _, node := range streams {
+		result.StartTimeArr = append(result.StartTimeArr, node.CreatedAt.UTC())
+		result.StreamerIDArr = append(result.StreamerIDArr, node.Broadcaster.Id)
+		result.StreamerLoginAtStartArr = append(result.StreamerLoginAtStartArr, node.Broadcaster.Login)
 		result.ProfileImageUrlAtStartArr = append(result.ProfileImageUrlAtStartArr, node.Broadcaster.ProfileImageURL)
 	}
 	return result
@@ -263,17 +276,31 @@ func fetchTwitchGqlForever(params fetchTwitchGqlForeverParams) {
 		}
 		// The queries to delete the old streams and upsert the new streams should be combined into a single transaction
 		requestCtx, requestCancel := context.WithTimeout(params.ctx, params.sqlRequestTimeLimit)
-		err = params.queries.DeleteOldStreams(requestCtx, time.Now().UTC().Add(-params.oldVodsDelete))
+		err = params.queries.DeleteOldStreams(requestCtx, responseReturnedTime.Add(-params.oldVodsDelete))
 		requestCancel()
 		if err != nil {
 			log.Println(fmt.Sprint("deleting old streams failed: ", err))
 			break
 		}
 		requestCtx, requestCancel = context.WithTimeout(params.ctx, params.sqlRequestTimeLimit)
-		err = params.queries.UpsertManyStreams(requestCtx, twitchGqlResponseToSqlParams(highViewNodes, responseReturnedTime))
+		err = params.queries.UpsertManyStreams(requestCtx, twitchGqlResponseUpsertStreamsParams(highViewNodes, responseReturnedTime))
 		requestCancel()
 		if err != nil {
 			log.Println(fmt.Sprint("Upserting streams to streams table failed: ", err))
+			break
+		}
+		requestCtx, requestCancel = context.WithTimeout(params.ctx, params.sqlRequestTimeLimit)
+		err = params.queries.DeleteOldStreamers(requestCtx, responseReturnedTime.Add(-params.oldVodsDelete))
+		requestCancel()
+		if err != nil {
+			log.Println(fmt.Sprint("deleting old streamers failed: ", err))
+			break
+		}
+		requestCtx, requestCancel = context.WithTimeout(params.ctx, params.sqlRequestTimeLimit)
+		err = params.queries.UpsertManyStreamers(requestCtx, twitchGqlResponseUpsertStreamersParams(highViewNodes))
+		requestCancel()
+		if err != nil {
+			log.Println(fmt.Sprint("Upserting streamers to streamers table failed: ", err))
 			break
 		}
 		// Evict vods with old last interaction time from wait vods queue and record iff at least record view count

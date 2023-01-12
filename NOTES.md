@@ -980,6 +980,25 @@ docker run -d --restart always \
   haproxy:2.7
 ```
 
+## Text Search
+
+One approach is to use Elastic Search and [PGSync](https://pgsync.com/).
+This approach is described [here](https://news.ycombinator.com/item?id=34315782).
+
+An alternative approach is to use Postgres.
+Basically, the default full text search sucks.
+If you want to search for a substring, use the `pg_trgm` extension and use that to index.
+That approach is used by [GitLab](https://news.ycombinator.com/item?id=11314210).
+
+After migrating up, I used the following to populate the `streamers` table.
+
+```sql
+INSERT INTO streamers(streamer_login_at_start, start_time, streamer_id, profile_image_url_at_start) SELECT DISTINCT ON (streamer_login_at_start) streamer_login_at_start, start_time, streamer_id, profile_image_url_at_start FROM streams ORDER BY streamer_login_at_start, start_time DESC;
+```
+
+Is it possible to DOS with some weird input to the `ILIKE` query. I'm not sure.
+To protect against it, I'm using regex to check if the input is good.
+
 ## TODO
 
 - Add infinite scroll, sort by recent, search for streamer name

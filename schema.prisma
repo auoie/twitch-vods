@@ -30,14 +30,22 @@ model streams {
   seek_previews_domain String?
 
   @@unique([stream_id, start_time]) // uniquely identifies stream
-
   @@index([streamer_id, start_time]) // used to fetch streams from streamer ordered by time
   @@index([streamer_login_at_start, start_time]) // used to get newest stream associated with streamer login
   @@index([last_updated_at]) // used to get most recently updated stream
   @@index([start_time]) // used to delete oldest streams
-
   @@index([public, sub_only, max_views, id]) // filter by public, sub_only then sort by (max_views, id) DESC
-
   @@index([game_id_at_start, public, sub_only, max_views, id]) // filter by (game_id_at_start, public, sub_only) then sort by (max_views, id) DESC
   @@index([language_at_start, public, sub_only, max_views, id]) // filter by (language_at_start, public, sub_only) then sort by (max_views, id) DESC
+}
+
+model streamers {
+  id                         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  start_time                 DateTime
+  streamer_login_at_start    String
+  streamer_id                String
+  profile_image_url_at_start String
+
+  @@unique([streamer_login_at_start]) // used to get streamer by login
+  @@index([start_time]) // used to delete oldest streams
 }

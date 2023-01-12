@@ -1,6 +1,6 @@
 /.vscode/
 /docker/
-/proxy/
+/reverse-proxy/
 /sqlc/
 /terraform/
 *.md

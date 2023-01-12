@@ -57,6 +57,22 @@ DO
     last_updated_at = EXCLUDED.last_updated_at,
     last_updated_minus_start_time_seconds = EXCLUDED.last_updated_minus_start_time_seconds,
     max_views = GREATEST(streams.max_views, EXCLUDED.max_views);
+  
+-- name: UpsertManyStreamers :exec
+INSERT INTO
+  streamers (streamer_id, start_time, streamer_login_at_start, profile_image_url_at_start)
+SELECT
+  unnest(@streamer_id_arr::TEXT[]) AS streamer_id,
+  unnest(@start_time_arr::TIMESTAMP(3)[]) AS start_time,
+  unnest(@streamer_login_at_start_arr::TEXT[]) AS streamer_login_at_start,
+  unnest(@profile_image_url_at_start_arr::TEXT[]) AS profile_image_url_at_start
+ON CONFLICT
+  (streamer_login_at_start)
+DO
+  UPDATE SET
+    streamer_id = EXCLUDED.streamer_id,
+    start_time = EXCLUDED.start_time,
+    profile_image_url_at_start = EXCLUDED.profile_image_url_at_start;
 
 -- name: GetLatestStreams :many
 SELECT
@@ -125,6 +141,16 @@ ORDER BY
   max_views DESC, id DESC
 LIMIT $4;
 
+-- name: GetMatchingStreamers :many
+SELECT
+  profile_image_url_at_start, streamer_login_at_start
+FROM
+  streamers
+WHERE
+  streamer_login_at_start ILIKE $1
+LIMIT
+  $2;
+
 -- name: GetPopularCategories :many
 WITH
   categories AS
@@ -165,6 +191,11 @@ ORDER BY
 
 -- name: DeleteOldStreams :exec
 DELETE FROM streams
+WHERE 
+  start_time < $1;
+
+-- name: DeleteOldStreamers :exec
+DELETE FROM streamers
 WHERE 
   start_time < $1;
 

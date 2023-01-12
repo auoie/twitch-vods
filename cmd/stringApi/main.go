@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"sync"
 	"time"
@@ -204,6 +205,29 @@ func makeLanguagesListHandler(languagesLock *LockValue[[]*sqlvods.GetLanguagesRo
 	}
 }
 
+func makeSearchHandler(ctx context.Context, regexCheck *regexp.Regexp, queries *sqlvods.Queries) httprouter.Handle {
+	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+		streamer := p.ByName("streamer")
+		if !regexCheck.MatchString(streamer) {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		results, err := queries.GetMatchingStreamers(ctx, sqlvods.GetMatchingStreamersParams{Limit: 20, StreamerLoginAtStart: fmt.Sprint("%", streamer, "%")})
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		bytes, err := json.Marshal(results)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Length", strconv.Itoa(len(bytes)))
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(bytes)
+	}
+}
+
 type TStreamResult[T any] struct {
 	Link     string
 	Metadata T
@@ -313,6 +337,10 @@ func main() {
 			}
 		}
 	}(ctx)
+	twitchUsernameRegex, err := regexp.Compile("^[a-zA-Z0-9_]{1,50}$")
+	if err != nil {
+		log.Fatal(fmt.Sprint("Failed to compile regex: ", err))
+	}
 
 	// pub-status: either public or private
 	// sub-status: either sub or free
@@ -324,6 +352,7 @@ func main() {
 	router.GET("/channels/:streamer", makeListHandler(ctx, queries, resultsGetLatestStreamsFromStreamerLogin, linkGetLatestStreamsFromStreamerLogin))
 	router.GET("/categories", makeCategoriesListHandler(categoriesLock))
 	router.GET("/languages", makeLanguagesListHandler(languagesLock))
+	router.GET("/search/:streamer", makeSearchHandler(ctx, twitchUsernameRegex, queries))
 	router.GET("/m3u8/:streamid/:unix/index.m3u8", makeM3U8Handler(ctx, queries))
 	log.Println(fmt.Sprint("Serving on port :", port))
 

@@ -36,3 +36,11 @@ type Stream struct {
 	BoxArtUrlAtStart                 string
 	ProfileImageUrlAtStart           string
 }
+
+type Streamer struct {
+	ID                     uuid.UUID
+	StartTime              time.Time
+	StreamerLoginAtStart   string
+	StreamerID             string
+	ProfileImageUrlAtStart string
+}
