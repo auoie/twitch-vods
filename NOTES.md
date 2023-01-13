@@ -1003,6 +1003,10 @@ To protect against it, I'm using regex to check if the input is good.
 
 - Add infinite scroll, sort by recent, search for streamer name
 - Open issue in Sqlc to create methods for struct fields like in Genqlient
+
+  [This issue](https://github.com/kyleconroy/sqlc/issues/444) already discusses it. Comments in the duplicate issue note that it would be hard to handle struct field and emitted method collisions. A better approach would be to create a separate program that generates getters from Golang structs. Basically [this](https://github.com/masaushi/accessory).
+  Go is trash, so I'm not make any changes.
+
 - Open issue in go-libdeflate to use newer version of libdeflate
 - I'm maintaining an infinite for loop.
   I should check if all the goroutines are closed using some tool to inspect the program internals.
