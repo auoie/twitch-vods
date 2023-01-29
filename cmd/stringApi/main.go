@@ -114,10 +114,6 @@ func makeListHandler[T any](
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		if len(results) == 0 {
-			w.WriteHeader(http.StatusNotFound)
-			return
-		}
 		streamResults := []TStreamResult[T]{}
 		for _, stream := range results {
 			streamResults = append(streamResults, TStreamResult[T]{
