@@ -213,6 +213,9 @@ func makeSearchHandler(ctx context.Context, regexCheck *regexp.Regexp, queries *
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
+		if results == nil {
+			results = []*sqlvods.GetMatchingStreamersRow{}
+		}
 		bytes, err := json.Marshal(results)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)

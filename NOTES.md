@@ -970,7 +970,6 @@ docker run -d --restart always \
   -e DATABASE_URL=$DOCKER_POSTGRES_DB \
   --network twitch-vods-network \
   twitch-vods-scraper
-cp ./reverse-proxy/haproxy/dev/haproxy.cfg ~/docker/twitch-vods/twitch-vods-haproxy
 docker run -d --restart always \
   --name twitch-vods-haproxy \
   --network twitch-vods-network \
