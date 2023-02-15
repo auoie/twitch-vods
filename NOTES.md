@@ -998,6 +998,20 @@ INSERT INTO streamers(streamer_login_at_start, start_time, streamer_id, profile_
 Is it possible to DOS with some weird input to the `ILIKE` query. I'm not sure.
 To protect against it, I'm using regex to check if the input is good.
 
+## Audio on iPhone
+
+The video `https://api.vodvod.top/m3u8/47971746813/1676421251/index.m3u8` for streamer `troygovoni23` was not playing.
+Using the `mediainfo` command shows that the Audio Format was `AAC LC` with 3 channels.
+This would not play on my iPhone, but it would play in `mpv` and in Chrome.
+If `mediainfo` showed `AAC LC` with 2 channels, then it would play in my iPhone.
+
+The multichannel [requirements](https://developer.apple.com/documentation/http_live_streaming/http_live_streaming_hls_authoring_specification_for_apple_devices) are linked [here](https://developer.apple.com/forums/thread/90013).
+Basically, the line `Stereo audio in AAC, HE-AAC v1, or HE-AAC v2 format MUST be provided.` means that because stereo audio is not provided, it won't play on an iPhone.
+
+This problem is mentioned [here](https://www.reddit.com/r/Twitch/comments/myga1l/my_streams_wont_play_on_iphone/).
+The solution from the user's perspective is to change the video resolution from Source resolution to 360p or something, so that the processed output has stereo audio output.
+The solution from the streamer's perspective is to stream with stereo audio rather than 3 channel audio.
+
 ## TODO
 
 - Add infinite scroll, sort by recent, search for streamer name
