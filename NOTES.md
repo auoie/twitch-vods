@@ -1021,8 +1021,19 @@ The solution from the streamer's perspective is to stream with stereo audio rath
 
 ## HaProxy Error
 
+Here is something important.
+
 - https://github.com/haproxy/haproxy/issues/2043
 - https://github.com/haproxy/haproxy/issues/1622
+
+Also, this is minor:
+
+```
+[WARNING]  (1) : config : missing timeouts for proxy 'stats'.
+   | While not properly invalid, you will certainly encounter various problems
+   | with such a configuration. To fix this, please ensure that all following
+   | timeouts are set to a non-zero value: 'client', 'connect', 'server'.
+```
 
 ## TODO
 
