@@ -21,7 +21,7 @@ ORDER BY
   start_time DESC
 LIMIT 1)
 SELECT
-  id, max_views, start_time, s.streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start, is_mature_at_start, game_id_at_start, bytes_found, public, sub_only, hls_duration_seconds, box_art_url_at_start, profile_image_url_at_start
+  id, max_views, start_time, s.streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start, is_mature_at_start, game_id_at_start, bytes_found, public, hls_duration_seconds, box_art_url_at_start, profile_image_url_at_start
 FROM
   streams s
 INNER JOIN
@@ -34,7 +34,7 @@ LIMIT $2;
 
 -- name: UpsertManyStreams :exec
 INSERT INTO
-  streams (last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start, profile_image_url_at_start, box_art_url_at_start, is_mature_at_start, game_id_at_start, last_updated_minus_start_time_seconds)
+  streams (last_updated_at, max_views, start_time, streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start, is_mature_at_start, game_id_at_start, last_updated_minus_start_time_seconds)
 SELECT
   unnest(@last_updated_at_arr::TIMESTAMP(3)[]) AS last_updated_at,
   unnest(@max_views_arr::BIGINT[]) AS max_views,
@@ -45,8 +45,6 @@ SELECT
   unnest(@game_name_at_start_arr::TEXT[]) AS game_name_at_start,
   unnest(@language_at_start_arr::TEXT[]) AS language_at_start,
   unnest(@title_at_start_arr::TEXT[]) AS title_at_start,
-  unnest(@profile_image_url_at_start_arr::TEXT[]) AS profile_image_url_at_start,
-  unnest(@box_art_url_at_start_at_start_arr::TEXT[]) AS box_art_url_at_start,
   unnest(@is_mature_at_start_arr::BOOLEAN[]) AS is_mature_at_start,
   unnest(@game_id_at_start_arr::TEXT[]) AS game_id_at_start,
   unnest(@last_updated_minus_start_time_seconds_arr::DOUBLE PRECISION[]) AS last_updated_minus_start_time_seconds
@@ -60,19 +58,17 @@ DO
   
 -- name: UpsertManyStreamers :exec
 INSERT INTO
-  streamers (streamer_id, start_time, streamer_login_at_start, profile_image_url_at_start)
+  streamers (streamer_id, start_time, streamer_login_at_start)
 SELECT
   unnest(@streamer_id_arr::TEXT[]) AS streamer_id,
   unnest(@start_time_arr::TIMESTAMP(3)[]) AS start_time,
-  unnest(@streamer_login_at_start_arr::TEXT[]) AS streamer_login_at_start,
-  unnest(@profile_image_url_at_start_arr::TEXT[]) AS profile_image_url_at_start
+  unnest(@streamer_login_at_start_arr::TEXT[]) AS streamer_login_at_start
 ON CONFLICT
   (streamer_login_at_start)
 DO
   UPDATE SET
     streamer_id = EXCLUDED.streamer_id,
-    start_time = EXCLUDED.start_time,
-    profile_image_url_at_start = EXCLUDED.profile_image_url_at_start;
+    start_time = EXCLUDED.start_time;
 
 -- name: GetLatestStreams :many
 SELECT
@@ -85,7 +81,7 @@ LIMIT $1;
 
 -- name: GetLatestLiveStreams :many
 SELECT
-  id, stream_id, streamer_id, streamer_login_at_start, start_time, max_views, last_updated_at
+  id, stream_id, streamer_id, streamer_login_at_start, game_id_at_start, start_time, max_views, last_updated_at
 FROM
   streams
 WHERE
@@ -100,46 +96,54 @@ SET
   hls_domain = $4,
   gzipped_bytes = $5,
   bytes_found = $6,
-  seek_previews_domain = $7,
-  public = $8,
-  sub_only = $9,
-  hls_duration_seconds = $10
+  public = $7,
+  hls_duration_seconds = $8,
+  profile_image_url_at_start = $9,
+  box_art_url_at_start = $10
 WHERE
   stream_id = $1 AND
   start_time = $2;
 
+-- name: UpdateStreamer :exec
+UPDATE
+  streamers
+SET
+  profile_image_url_at_start = $2
+WHERE
+  streamer_login_at_start = $1;
+
 -- name: GetPopularLiveStreams :many
 SELECT
-  id, max_views, start_time, streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start, is_mature_at_start, game_id_at_start, bytes_found, public, sub_only, hls_duration_seconds, box_art_url_at_start, profile_image_url_at_start
+  id, max_views, start_time, streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start, is_mature_at_start, game_id_at_start, bytes_found, public, hls_duration_seconds, box_art_url_at_start, profile_image_url_at_start
 FROM
   streams
 WHERE
-  public = $1 AND sub_only = $2
+  public = $1
+ORDER BY
+  max_views DESC, id DESC
+LIMIT $2;
+
+-- name: GetPopularLiveStreamsByLanguage :many
+SELECT
+  id, max_views, start_time, streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start, is_mature_at_start, game_id_at_start, bytes_found, public, hls_duration_seconds, box_art_url_at_start, profile_image_url_at_start
+FROM
+  streams
+WHERE
+  language_at_start = $1 AND public = $2
 ORDER BY
   max_views DESC, id DESC
 LIMIT $3;
 
--- name: GetPopularLiveStreamsByLanguage :many
-SELECT
-  id, max_views, start_time, streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start, is_mature_at_start, game_id_at_start, bytes_found, public, sub_only, hls_duration_seconds, box_art_url_at_start, profile_image_url_at_start
-FROM
-  streams
-WHERE
-  language_at_start = $1 AND public = $2 AND sub_only = $3
-ORDER BY
-  max_views DESC, id DESC
-LIMIT $4;
-
 -- name: GetPopularLiveStreamsByGameId :many
 SELECT
-  id, max_views, start_time, streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start, is_mature_at_start, game_id_at_start, bytes_found, public, sub_only, hls_duration_seconds, box_art_url_at_start, profile_image_url_at_start
+  id, max_views, start_time, streamer_id, stream_id, streamer_login_at_start, game_name_at_start, language_at_start, title_at_start, is_mature_at_start, game_id_at_start, bytes_found, public, hls_duration_seconds, box_art_url_at_start, profile_image_url_at_start
 FROM
   streams
 WHERE
-  game_id_at_start = $1 AND public = $2 AND sub_only = $3
+  game_id_at_start = $1 AND public = $2
 ORDER BY
   max_views DESC, id DESC
-LIMIT $4;
+LIMIT $3;
 
 -- name: GetMatchingStreamers :many
 SELECT

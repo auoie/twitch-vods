@@ -38,9 +38,8 @@ func bongHandler(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 // It would be nice if SQLC created methods to access struct field like Genqlient
 func resultsGetPopularLiveStreams(ctx context.Context, w http.ResponseWriter, p httprouter.Params, queries *sqlvods.Queries) ([]*sqlvods.GetPopularLiveStreamsRow, error, bool) {
 	results, err := queries.GetPopularLiveStreams(ctx, sqlvods.GetPopularLiveStreamsParams{
-		Public:  sql.NullBool{Bool: p.ByName("pub-status") == "public", Valid: true},
-		SubOnly: sql.NullBool{Bool: p.ByName("sub-status") == "sub", Valid: true},
-		Limit:   50,
+		Public: sql.NullBool{Bool: p.ByName("pub-status") == "public", Valid: true},
+		Limit:  50,
 	})
 	return results, err, false
 }
@@ -57,7 +56,6 @@ func resultsGetPopularLiveStreamsByLanguage(ctx context.Context, w http.Response
 	results, err := queries.GetPopularLiveStreamsByLanguage(ctx, sqlvods.GetPopularLiveStreamsByLanguageParams{
 		LanguageAtStart: language,
 		Public:          sql.NullBool{Bool: p.ByName("pub-status") == "public", Valid: true},
-		SubOnly:         sql.NullBool{Bool: p.ByName("sub-status") == "sub", Valid: true},
 		Limit:           50,
 	})
 	return results, err, false
@@ -75,7 +73,6 @@ func resultsGetPopularLiveStreamsByGameId(ctx context.Context, w http.ResponseWr
 	results, err := queries.GetPopularLiveStreamsByGameId(ctx, sqlvods.GetPopularLiveStreamsByGameIdParams{
 		GameIDAtStart: categoryId,
 		Public:        sql.NullBool{Bool: p.ByName("pub-status") == "public", Valid: true},
-		SubOnly:       sql.NullBool{Bool: p.ByName("sub-status") == "sub", Valid: true},
 		Limit:         50,
 	})
 	return results, err, false
@@ -342,12 +339,11 @@ func main() {
 	}
 
 	// pub-status: either public or private
-	// sub-status: either sub or free
 	router.GET("/", okHandler)
 	router.GET("/bing", bongHandler)
-	router.GET("/all/:pub-status/:sub-status", makeListHandler(ctx, queries, resultsGetPopularLiveStreams, linkGetPopularLiveStreams))
-	router.GET("/language/:language/all/:pub-status/:sub-status", makeListHandler(ctx, queries, resultsGetPopularLiveStreamsByLanguage, linkGetPopularLiveStreamsByLanguage))
-	router.GET("/category/:game-id/all/:pub-status/:sub-status", makeListHandler(ctx, queries, resultsGetPopularLiveStreamsByGameId, linkGetPopularLiveStreamsByGameId))
+	router.GET("/all/:pub-status", makeListHandler(ctx, queries, resultsGetPopularLiveStreams, linkGetPopularLiveStreams))
+	router.GET("/language/:language/all/:pub-status", makeListHandler(ctx, queries, resultsGetPopularLiveStreamsByLanguage, linkGetPopularLiveStreamsByLanguage))
+	router.GET("/category/:game-id/all/:pub-status", makeListHandler(ctx, queries, resultsGetPopularLiveStreamsByGameId, linkGetPopularLiveStreamsByGameId))
 	router.GET("/channels/:streamer", makeListHandler(ctx, queries, resultsGetLatestStreamsFromStreamerLogin, linkGetLatestStreamsFromStreamerLogin))
 	router.GET("/categories", makeCategoriesListHandler(categoriesLock))
 	router.GET("/languages", makeLanguagesListHandler(languagesLock))

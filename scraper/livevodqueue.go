@@ -69,11 +69,12 @@ func (vods *liveVodsPriorityQueue) RemoveVod(vod *LiveVod) {
 func (vods *liveVodsPriorityQueue) UpsertVod(data VodDataPoint) (*LiveVod, error) {
 	node := data.Node
 	liveVod := &LiveVod{
-		StreamerId:           node.Broadcaster.Id,
-		StreamId:             node.Id,
-		StartTimeUnix:        node.CreatedAt.UTC().Unix(),
-		StreamerLoginAtStart: node.Broadcaster.Login,
-		MaxViews:             node.ViewersCount,
+		StreamerId:           node.UserID,
+		StreamId:             node.ID,
+		StartTimeUnix:        node.StartedAt.UTC().Unix(),
+		StreamerLoginAtStart: node.UserLogin,
+		GameIdAtStart:        node.GameID,
+		MaxViews:             node.ViewerCount,
 		LastUpdatedUnix:      data.ResponseReturnedTimeUnix,
 		LastInteractionUnix:  data.ResponseReturnedTimeUnix,
 	}

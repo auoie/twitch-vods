@@ -13,6 +13,7 @@ require (
 	github.com/jdvr/go-again v1.0.0
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/monitor1379/yagods v1.13.0
+	github.com/nicklaw5/helix v1.25.0
 )
 
 require (
@@ -20,6 +21,7 @@ require (
 	github.com/alexflint/go-arg v1.4.3 // indirect
 	github.com/alexflint/go-scalar v1.2.0 // indirect
 	github.com/auoie/first-nonerr v1.1.0 // indirect
+	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
 	github.com/jackc/pgio v1.0.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect

@@ -526,6 +526,8 @@ docker run -d --restart always \
 docker run -d --restart always \
   --name twitch-vods-scraper \
   -e DATABASE_URL=$DOCKER_POSTGRES_DB \
+  -e CLIENT_ID=$CLIENT_ID \
+  -e CLIENT_SECRET=$CLIENT_SECRET \
   --network twitch-vods-network \
   twitch-vods-scraper
 mkdir -p ~/docker/twitch-vods/twitch-vods-caddy
@@ -946,6 +948,9 @@ rsync -avzhP --compress-choice=zstd --compress-level=1 --checksum-choice=xxh3 ~/
 rsync -avzhP --compress-choice=zstd --compress-level=1 --checksum-choice=xxh3 ./reverse-proxy/haproxy/prod/ $REMOTE:docker/twitch-vods/twitch-vods-haproxy/
 ssh $REMOTE # back in remote, just run the docker containers
 # set PASSWORD env variable
+# set CLIENT_ID env variable
+# set CLIENT_SECRET env variable
+# set CLIENT_URL env variable
 DOCKER_POSTGRES_DB="postgresql://twitch-vods-admin:$PASSWORD@twitch-vods-db:5432/twitch-vods"
 docker run -d --restart always \
   --name twitch-vods-db \
@@ -968,6 +973,8 @@ docker run -d --restart always \
 docker run -d --restart always \
   --name twitch-vods-scraper \
   -e DATABASE_URL=$DOCKER_POSTGRES_DB \
+  -e CLIENT_ID=$CLIENT_ID \
+  -e CLIENT_SECRET=$CLIENT_SECRET \
   --network twitch-vods-network \
   twitch-vods-scraper
 docker run -d --restart always \
@@ -1011,6 +1018,11 @@ Basically, the line `Stereo audio in AAC, HE-AAC v1, or HE-AAC v2 format MUST be
 This problem is mentioned [here](https://www.reddit.com/r/Twitch/comments/myga1l/my_streams_wont_play_on_iphone/).
 The solution from the user's perspective is to change the video resolution from Source resolution to 360p or something, so that the processed output has stereo audio output.
 The solution from the streamer's perspective is to stream with stereo audio rather than 3 channel audio.
+
+## HaProxy Error
+
+- https://github.com/haproxy/haproxy/issues/2043
+- https://github.com/haproxy/haproxy/issues/1622
 
 ## TODO
 

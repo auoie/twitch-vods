@@ -7,21 +7,21 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/4kills/go-libdeflate/v2"
-	"github.com/Khan/genqlient/graphql"
 	"github.com/auoie/goVods/vods"
 	"github.com/auoie/twitch-vods/sqlvods"
-	"github.com/auoie/twitch-vods/twitchgql"
 	"github.com/grafov/m3u8"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/jdvr/go-again"
+	"github.com/nicklaw5/helix"
 )
 
 type VodDataPoint struct {
 	ResponseReturnedTimeUnix int64
-	Node                     twitchgql.VodNode
+	Node                     *helix.Stream
 }
 
 type LiveVod struct {
@@ -29,6 +29,7 @@ type LiveVod struct {
 	StreamId             string
 	StartTimeUnix        int64
 	StreamerLoginAtStart string
+	GameIdAtStart        string
 	MaxViews             int
 	LastUpdatedUnix      int64 // time twitchgql request completed
 	LastInteractionUnix  int64 // last time interacted with (e.g. time twitchgql request completed or time sql fetch completed)
@@ -49,15 +50,15 @@ type VodResult struct {
 	HlsBytesFound      bool
 	RequestInitiated   time.Time
 	HlsDomain          sql.NullString
-	SeekPreviewsDomain sql.NullString
 	Public             sql.NullBool
-	SubOnly            sql.NullBool
+	ProfileImageUrl    sql.NullString
+	BoxArtUrl          sql.NullString
 	HlsDurationSeconds sql.NullFloat64
 }
 
 func edgeNodesMatchingAndNonEmpty(
-	a []twitchgql.GetStreamsStreamsStreamConnectionEdgesStreamEdge,
-	b []twitchgql.GetStreamsStreamsStreamConnectionEdgesStreamEdge,
+	a []helix.Stream,
+	b []helix.Stream,
 ) bool {
 	if len(a) != len(b) {
 		return false
@@ -66,19 +67,19 @@ func edgeNodesMatchingAndNonEmpty(
 		return false
 	}
 	for index := range a {
-		if a[index].Node.Id != b[index].Node.Id {
+		if a[index].ID != b[index].ID {
 			return false
 		}
 	}
 	return true
 }
 
-type fetchTwitchGqlForeverParams struct {
+type fetchTwitchHelixForeverParams struct {
 	ctx                      context.Context
 	initialWaitVodQueue      *waitVodsPriorityQueue
-	twitchGqlClient          graphql.Client
+	twitchHelixClient        *helix.Client
 	sqlRequestTimeLimit      time.Duration
-	twitchGqlFetcherDelay    time.Duration
+	twitchHelixFetcherDelay  time.Duration
 	cursorResetThreshold     time.Duration
 	liveVodEvictionThreshold time.Duration
 	waitVodEvictionThreshold time.Duration
@@ -87,44 +88,49 @@ type fetchTwitchGqlForeverParams struct {
 	minViewerCountToRecord   int
 	queries                  *sqlvods.Queries
 	numStreamsPerRequest     int
-	cursorFactor             float64
 	oldVodsDelete            time.Duration
 	done                     chan struct{}
 }
 
 func twitchGqlResponseUpsertStreamsParams(
-	streams []*twitchgql.GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStream,
+	streams []*helix.Stream,
 	responseReturnedTime time.Time,
 ) sqlvods.UpsertManyStreamsParams {
 	result := sqlvods.UpsertManyStreamsParams{}
 	for _, node := range streams {
 		result.LastUpdatedAtArr = append(result.LastUpdatedAtArr, responseReturnedTime)
-		result.MaxViewsArr = append(result.MaxViewsArr, int64(node.ViewersCount))
-		result.StartTimeArr = append(result.StartTimeArr, node.CreatedAt.UTC())
-		result.StreamIDArr = append(result.StreamIDArr, node.Id)
-		result.StreamerIDArr = append(result.StreamerIDArr, node.Broadcaster.Id)
-		result.StreamerLoginAtStartArr = append(result.StreamerLoginAtStartArr, node.Broadcaster.Login)
-		result.GameNameAtStartArr = append(result.GameNameAtStartArr, node.Game.Name)
-		result.LanguageAtStartArr = append(result.LanguageAtStartArr, string(node.Broadcaster.BroadcastSettings.Language))
-		result.TitleAtStartArr = append(result.TitleAtStartArr, node.Broadcaster.BroadcastSettings.Title)
-		result.GameIDAtStartArr = append(result.GameIDAtStartArr, node.Game.Id)
-		result.IsMatureAtStartArr = append(result.IsMatureAtStartArr, node.Broadcaster.BroadcastSettings.IsMature)
-		result.LastUpdatedMinusStartTimeSecondsArr = append(result.LastUpdatedMinusStartTimeSecondsArr, responseReturnedTime.Sub(node.CreatedAt.UTC()).Seconds())
-		result.BoxArtUrlAtStartAtStartArr = append(result.BoxArtUrlAtStartAtStartArr, node.Game.BoxArtURL)
-		result.ProfileImageUrlAtStartArr = append(result.ProfileImageUrlAtStartArr, node.Broadcaster.ProfileImageURL)
+		result.MaxViewsArr = append(result.MaxViewsArr, int64(node.ViewerCount))
+		result.StartTimeArr = append(result.StartTimeArr, node.StartedAt.UTC())
+		result.StreamIDArr = append(result.StreamIDArr, node.ID)
+		result.StreamerIDArr = append(result.StreamerIDArr, node.UserID)
+		result.StreamerLoginAtStartArr = append(result.StreamerLoginAtStartArr, node.UserLogin)
+		result.GameNameAtStartArr = append(result.GameNameAtStartArr, node.GameName)
+		result.LanguageAtStartArr = append(result.LanguageAtStartArr, string(node.Language))
+		result.TitleAtStartArr = append(result.TitleAtStartArr, node.Title)
+		result.GameIDAtStartArr = append(result.GameIDAtStartArr, node.GameID)
+		result.IsMatureAtStartArr = append(result.IsMatureAtStartArr, node.IsMature)
+		result.LastUpdatedMinusStartTimeSecondsArr = append(result.LastUpdatedMinusStartTimeSecondsArr, responseReturnedTime.Sub(node.StartedAt).Seconds())
 	}
 	return result
 }
 
+func resetAppAccessToken(client *helix.Client) error {
+	appAccessToken, err := client.RequestAppAccessToken([]string{})
+	if err != nil {
+		return err
+	}
+	client.SetAppAccessToken(appAccessToken.Data.AccessToken)
+	return nil
+}
+
 func twitchGqlResponseUpsertStreamersParams(
-	streams []*twitchgql.GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStream,
+	streams []*helix.Stream,
 ) sqlvods.UpsertManyStreamersParams {
 	result := sqlvods.UpsertManyStreamersParams{}
 	for _, node := range streams {
-		result.StartTimeArr = append(result.StartTimeArr, node.CreatedAt.UTC())
-		result.StreamerIDArr = append(result.StreamerIDArr, node.Broadcaster.Id)
-		result.StreamerLoginAtStartArr = append(result.StreamerLoginAtStartArr, node.Broadcaster.Login)
-		result.ProfileImageUrlAtStartArr = append(result.ProfileImageUrlAtStartArr, node.Broadcaster.ProfileImageURL)
+		result.StartTimeArr = append(result.StartTimeArr, node.StartedAt.UTC())
+		result.StreamerIDArr = append(result.StreamerIDArr, node.UserID)
+		result.StreamerLoginAtStartArr = append(result.StreamerLoginAtStartArr, node.UserLogin)
 	}
 	return result
 }
@@ -138,12 +144,12 @@ func retryOnError[T any](doer func() (T, error)) (T, error) {
 	return res, err
 }
 
-func fetchTwitchGqlForever(params fetchTwitchGqlForeverParams) {
+func fetchTwitchHelixForever(params fetchTwitchHelixForeverParams) {
 	log.Println("Inside fetchTwitchGqlForever...")
-	log.Println(fmt.Sprint("Fetcher delay: ", params.twitchGqlFetcherDelay))
+	log.Println(fmt.Sprint("Fetcher delay: ", params.twitchHelixFetcherDelay))
 	liveVodQueue := CreateNewLiveVodsPriorityQueue()
 	waitVodQueue := params.initialWaitVodQueue
-	twitchGqlTicker := time.NewTicker(params.twitchGqlFetcherDelay)
+	twitchGqlTicker := time.NewTicker(params.twitchHelixFetcherDelay)
 	defer twitchGqlTicker.Stop()
 	cursor := ""
 	resetCursorTimeout := time.Now().UTC().Add(params.cursorResetThreshold)
@@ -153,9 +159,15 @@ func fetchTwitchGqlForever(params fetchTwitchGqlForeverParams) {
 		debugIndex = -1
 		cursor = ""
 		resetCursorTimeout = time.Now().UTC().Add(params.cursorResetThreshold)
+		_, err := retryOnError(func() (struct{}, error) {
+			return struct{}{}, resetAppAccessToken(params.twitchHelixClient)
+		})
+		if err != nil {
+			log.Println(err)
+		}
 	}
 	log.Println("Starting twitchgql infinite for loop.")
-	prevEdges := []twitchgql.GetStreamsStreamsStreamConnectionEdgesStreamEdge{}
+	prevEdges := []helix.Stream{}
 	debugMod := 10
 	for {
 		// Wait until done are next ticker
@@ -172,8 +184,11 @@ func fetchTwitchGqlForever(params fetchTwitchGqlForeverParams) {
 			resetCursor()
 		}
 		// Request live streams
-		streams, err := retryOnError(func() (*twitchgql.GetStreamsResponse, error) {
-			return twitchgql.GetStreams(params.ctx, params.twitchGqlClient, params.numStreamsPerRequest, cursor)
+		streams, err := retryOnError(func() (*helix.StreamsResponse, error) {
+			return params.twitchHelixClient.GetStreams(&helix.StreamsParams{
+				After: cursor,
+				First: params.numStreamsPerRequest,
+			})
 		})
 		responseReturnedTime := time.Now().UTC()
 		responseReturnedTimeUnix := responseReturnedTime.Unix()
@@ -184,11 +199,11 @@ func fetchTwitchGqlForever(params fetchTwitchGqlForeverParams) {
 			continue
 		}
 		// Get the next cursor and if there are no streams or no next page, reset cursor
-		edges := streams.Streams.Edges
+		edges := streams.Data.Streams
 		if len(edges) == 0 {
 			log.Println("edges has length 0")
 			resetCursor()
-		} else if !streams.Streams.PageInfo.HasNextPage {
+		} else if streams.Data.Pagination.Cursor == "" {
 			log.Println("streams.Streams.PageInfo does not have next page")
 			resetCursor()
 		} else {
@@ -203,9 +218,9 @@ func fetchTwitchGqlForever(params fetchTwitchGqlForeverParams) {
 				log.Println("prevEdges and edges node ids:")
 				log.Println("prevEdges: ", prevEdges)
 				log.Println("edges: ", edges)
-				cursor = edges[len(edges)-1].Cursor
+				cursor = streams.Data.Pagination.Cursor
 			} else {
-				cursor = edges[int(params.cursorFactor*float64(len(edges)))].Cursor
+				cursor = streams.Data.Pagination.Cursor
 			}
 		}
 		prevEdges = edges
@@ -213,16 +228,16 @@ func fetchTwitchGqlForever(params fetchTwitchGqlForeverParams) {
 		numRemoved := 0
 		oldVods := []*LiveVod{}
 		allVodsLessThanMinViewerCount := true
-		highViewNodes := []*twitchgql.GetStreamsStreamsStreamConnectionEdgesStreamEdgeNodeStream{}
+		highViewNodes := []*helix.Stream{}
 		for _, edge := range edges {
-			nodeClone := edge.Node
+			nodeClone := edge
 			node := &nodeClone
-			if node.ViewersCount < params.minViewerCountToObserve {
+			if node.ViewerCount < params.minViewerCountToObserve {
 				continue
 			}
 			highViewNodes = append(highViewNodes, node)
 			allVodsLessThanMinViewerCount = false
-			waitVod, err := waitVodQueue.GetByStreamIdStartTime(node.Id, node.CreatedAt.UTC().Unix())
+			waitVod, err := waitVodQueue.GetByStreamIdStartTime(node.ID, node.StartedAt.UTC().Unix())
 			if err == nil {
 				log.Println(fmt.Sprint("Removing vod from wait queue: ", *waitVod))
 				waitVodQueue.RemoveVod(waitVod)
@@ -451,53 +466,77 @@ func getVodCompressedBytes(ctx context.Context, videoData *vods.VideoData, compr
 }
 
 type videoStatus struct {
-	seekPreviewsDomain sql.NullString
-	public             bool
-	subOnly            bool
+	public          sql.NullBool
+	boxArtUrl       sql.NullString
+	profileImageUrl sql.NullString
 }
 
-func getVideoStatus(ctx context.Context, client graphql.Client, streamerId string, streamId string) (videoStatus, error) {
-	response, err := retryOnError(func() (*twitchgql.GetUserDataResponse, error) {
-		return twitchgql.GetUserData(ctx, client, streamerId)
-	})
-	if err != nil {
-		log.Println(fmt.Sprint("error getting user data for (", streamerId, ", ", streamId, "): ", err))
-		return videoStatus{}, err
-	}
-	videos := response.User.Videos.Edges
-	public := false
-	var seekPreviewsDomain sql.NullString
-	for _, cur := range videos {
-		seekPreviewsUrl := cur.Node.SeekPreviewsURL
-		dwp, err := vods.UrlToDomainWithPath(seekPreviewsUrl)
+func SetBoxArtWidthHeight(boxArtUrl string, width int, height int) string {
+	return strings.Replace(boxArtUrl, "-{width}x{height}", fmt.Sprint("-", width, "x", height), 1)
+}
+
+func SetProfileImageWidth(profileImageUrl string, width int) string {
+	return strings.Replace(profileImageUrl, "-300x300.png", fmt.Sprint("-", width, "x", width, ".png"), 1)
+}
+
+func getVideoStatus(ctx context.Context, client *helix.Client, streamerId string, streamId string, gameId string) videoStatus {
+	var public sql.NullBool
+	{
+		response, err := retryOnError(func() (*helix.VideosResponse, error) {
+			return client.GetVideos(&helix.VideosParams{UserID: streamerId})
+		})
 		if err != nil {
-			log.Println(fmt.Sprint("error converting url to domain with path for (", streamerId, ", ", streamId, ", ", seekPreviewsUrl, "): ", err))
-			continue
+			log.Println(fmt.Sprint("error getting user data for (", streamerId, ", ", streamId, "): ", err))
+		} else {
+			public = sql.NullBool{Valid: true, Bool: false}
+			videos := response.Data.Videos
+			for _, cur := range videos {
+				if cur.StreamID == streamId {
+					public = sql.NullBool{Valid: true, Bool: true}
+					break
+				}
+			}
 		}
-		if dwp.Path.VideoData.VideoId == streamId {
-			public = true
-			seekPreviewsDomain = sql.NullString{String: dwp.Domain, Valid: true}
-			break
+
+	}
+	var profileImageUrl sql.NullString
+	{
+		usersResponse, _ := retryOnError(func() (*helix.UsersResponse, error) {
+			return client.GetUsers(&helix.UsersParams{IDs: []string{streamerId}})
+		})
+		if len(usersResponse.Data.Users) > 0 {
+			profileImageUrlStr := usersResponse.Data.Users[0].ProfileImageURL
+			profileImageUrlStr = SetProfileImageWidth(profileImageUrlStr, 50)
+			profileImageUrl = sql.NullString{Valid: true, String: profileImageUrlStr}
 		}
 	}
-	subProducts := response.User.SubscriptionProducts
-	subOnly := len(subProducts) > 0 && subProducts[0].HasSubonlyVideoArchive
+	var boxArtUrl sql.NullString
+	{
+		gamesResponse, _ := retryOnError(func() (*helix.GamesResponse, error) {
+			return client.GetGames(&helix.GamesParams{IDs: []string{gameId}})
+		})
+		if len(gamesResponse.Data.Games) > 0 {
+			boxArtUrlStr := gamesResponse.Data.Games[0].BoxArtURL
+			boxArtUrlStr = SetBoxArtWidthHeight(boxArtUrlStr, 40, 56)
+			boxArtUrl = sql.NullString{Valid: true, String: boxArtUrlStr}
+		}
+	}
 	return videoStatus{
-		public:             public,
-		subOnly:            subOnly,
-		seekPreviewsDomain: seekPreviewsDomain,
-	}, nil
+		public:          public,
+		profileImageUrl: profileImageUrl,
+		boxArtUrl:       boxArtUrl,
+	}
 }
 
 type hlsWorkerFetchCompressSendParams struct {
-	ctx              context.Context
-	twitchGqlClient  graphql.Client
-	httpClient       *http.Client
-	oldVodJobsCh     chan *LiveVod
-	hlsFetcherDelay  time.Duration
-	compressor       *libdeflate.Compressor
-	resultsCh        chan *VodResult
-	requestTimeLimit time.Duration
+	ctx               context.Context
+	twitchHelixClient *helix.Client
+	httpClient        *http.Client
+	oldVodJobsCh      chan *LiveVod
+	hlsFetcherDelay   time.Duration
+	compressor        *libdeflate.Compressor
+	resultsCh         chan *VodResult
+	requestTimeLimit  time.Duration
 }
 
 func hlsWorkerFetchCompressSend(params hlsWorkerFetchCompressSendParams) {
@@ -549,12 +588,10 @@ func hlsWorkerFetchCompressSend(params hlsWorkerFetchCompressSendParams) {
 				},
 			}
 		}
-		videoMeta, err := getVideoStatus(params.ctx, params.twitchGqlClient, oldVod.StreamerId, oldVod.StreamId)
-		if err == nil {
-			result.Public = sql.NullBool{Bool: videoMeta.public, Valid: true}
-			result.SeekPreviewsDomain = videoMeta.seekPreviewsDomain
-			result.SubOnly = sql.NullBool{Bool: videoMeta.subOnly, Valid: true}
-		}
+		videoMeta := getVideoStatus(params.ctx, params.twitchHelixClient, oldVod.StreamerId, oldVod.StreamId, oldVod.GameIdAtStart)
+		result.Public = videoMeta.public
+		result.BoxArtUrl = videoMeta.boxArtUrl
+		result.ProfileImageUrl = videoMeta.profileImageUrl
 		select {
 		case <-params.ctx.Done():
 			return
@@ -578,20 +615,29 @@ func processVodResults(ctx context.Context, resultsCh chan *VodResult, done chan
 		log.Println(*result.Vod)
 		log.Println(fmt.Sprint("Gzipped size: ", len(result.HlsBytes)))
 		upsertRecordingParams := sqlvods.UpdateRecordingParams{
-			RecordingFetchedAt: sql.NullTime{Time: result.RequestInitiated, Valid: true},
-			GzippedBytes:       result.HlsBytes,
-			StreamID:           result.Vod.StreamId,
-			BytesFound:         sql.NullBool{Bool: result.HlsBytesFound, Valid: true},
-			HlsDomain:          result.HlsDomain,
-			SeekPreviewsDomain: result.SeekPreviewsDomain,
-			Public:             result.Public,
-			SubOnly:            result.SubOnly,
-			HlsDurationSeconds: result.HlsDurationSeconds,
-			StartTime:          time.Unix(result.Vod.StartTimeUnix, 0).UTC(),
+			RecordingFetchedAt:     sql.NullTime{Time: result.RequestInitiated, Valid: true},
+			GzippedBytes:           result.HlsBytes,
+			StreamID:               result.Vod.StreamId,
+			BytesFound:             sql.NullBool{Bool: result.HlsBytesFound, Valid: true},
+			HlsDomain:              result.HlsDomain,
+			Public:                 result.Public,
+			HlsDurationSeconds:     result.HlsDurationSeconds,
+			ProfileImageUrlAtStart: result.ProfileImageUrl,
+			BoxArtUrlAtStart:       result.BoxArtUrl,
+			StartTime:              time.Unix(result.Vod.StartTimeUnix, 0).UTC(),
 		}
 		err := queries.UpdateRecording(ctx, upsertRecordingParams)
 		if err != nil {
 			log.Println(fmt.Sprint("upserting recording failed: ", err))
+			break
+		}
+		updateStreamerParams := sqlvods.UpdateStreamerParams{
+			StreamerLoginAtStart:   result.Vod.StreamerLoginAtStart,
+			ProfileImageUrlAtStart: result.ProfileImageUrl,
+		}
+		err = queries.UpdateStreamer(ctx, updateStreamerParams)
+		if err != nil {
+			log.Println(fmt.Sprint("updating streamer failed: ", err))
 			break
 		}
 	}
@@ -630,20 +676,33 @@ func ScrapeTwitchLiveVodsWithGqlApi(ctx context.Context, params ScrapeTwitchLive
 	log.Println("Starting scraping...")
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	twitchGqlClient := twitchgql.NewTwitchGqlClient(params.RequestTimeLimit)
 	httpClient := makeRobustHttpClient(params.RequestTimeLimit)
+	twitchHelixClient, err := helix.NewClient(&helix.Options{
+		ClientID:     params.ClientId,
+		ClientSecret: params.ClientSecret,
+		HTTPClient:   httpClient,
+	})
+	if err != nil {
+		return err
+	}
+	_, err = retryOnError(func() (struct{}, error) {
+		return struct{}{}, resetAppAccessToken(twitchHelixClient)
+	})
+	if err != nil {
+		return err
+	}
 	oldVodsCh := make(chan []*LiveVod)
 	oldVodJobsCh := make(chan *LiveVod)
 	resultsCh := make(chan *VodResult)
 	done := make(chan struct{})
 	log.Println("Made twitchgql client and channels.")
-	go fetchTwitchGqlForever(
-		fetchTwitchGqlForeverParams{
+	go fetchTwitchHelixForever(
+		fetchTwitchHelixForeverParams{
 			ctx:                      ctx,
-			twitchGqlClient:          twitchGqlClient,
+			twitchHelixClient:        twitchHelixClient,
 			initialWaitVodQueue:      params.InitialWaitVodQueue,
 			sqlRequestTimeLimit:      params.RequestTimeLimit,
-			twitchGqlFetcherDelay:    params.TwitchGqlFetcherDelay,
+			twitchHelixFetcherDelay:  params.TwitchHelixFetcherDelay,
 			cursorResetThreshold:     params.CursorResetThreshold,
 			liveVodEvictionThreshold: params.LiveVodEvictionThreshold,
 			waitVodEvictionThreshold: params.WaitVodEvictionThreshold,
@@ -652,7 +711,6 @@ func ScrapeTwitchLiveVodsWithGqlApi(ctx context.Context, params ScrapeTwitchLive
 			minViewerCountToRecord:   params.MinViewerCountToRecord,
 			queries:                  params.Queries,
 			numStreamsPerRequest:     params.NumStreamsPerRequest,
-			cursorFactor:             params.CursorFactor,
 			oldVodsDelete:            params.OldVodsDelete,
 			done:                     done,
 		},
@@ -669,14 +727,14 @@ func ScrapeTwitchLiveVodsWithGqlApi(ctx context.Context, params ScrapeTwitchLive
 			return err
 		}
 		go hlsWorkerFetchCompressSend(hlsWorkerFetchCompressSendParams{
-			ctx:              ctx,
-			twitchGqlClient:  twitchGqlClient,
-			httpClient:       httpClient,
-			oldVodJobsCh:     oldVodJobsCh,
-			hlsFetcherDelay:  params.HlsFetcherDelay,
-			compressor:       &compressor,
-			resultsCh:        resultsCh,
-			requestTimeLimit: params.RequestTimeLimit,
+			ctx:               ctx,
+			twitchHelixClient: twitchHelixClient,
+			httpClient:        httpClient,
+			oldVodJobsCh:      oldVodJobsCh,
+			hlsFetcherDelay:   params.HlsFetcherDelay,
+			compressor:        &compressor,
+			resultsCh:         resultsCh,
+			requestTimeLimit:  params.RequestTimeLimit,
 		})
 	}
 	go processVodResults(ctx, resultsCh, done, params.Queries)
@@ -689,8 +747,8 @@ func ScrapeTwitchLiveVodsWithGqlApi(ctx context.Context, params ScrapeTwitchLive
 
 type RunScraperParams struct {
 	// In any interval of this length, the api will be called at most twice and on average once.
-	TwitchGqlFetcherDelay time.Duration
-	// Time limit for .m3u8 and Twitch GQL requests. If this is exceeded in the TwitchGQL loop, the for-loop continues. TODO: I should fix this.
+	TwitchHelixFetcherDelay time.Duration
+	// Time limit for .m3u8 and Twitch Helix requests. If this is exceeded in the TwitchGQL loop, the for-loop continues. TODO: I should fix this.
 	RequestTimeLimit time.Duration
 	// If a VOD in the queue of live VODs has a last updated time older than this, it is moved out of the live VODs queue.
 	LiveVodEvictionThreshold time.Duration
@@ -714,10 +772,12 @@ type RunScraperParams struct {
 	MinViewerCountToRecord int
 	// Num streams per request (must be between 1 and 30 inclusive)
 	NumStreamsPerRequest int
-	// Cursor at index CursorFactor * len(edges) is used. So it must satisfy 0 <= CursorFactor < 1 to not panic.
-	CursorFactor float64
 	// Vods older than the current time minus this duration will be deleted
 	OldVodsDelete time.Duration
+	// Twitch helix client ID
+	ClientId string
+	// Twitch helix client secret
+	ClientSecret string
 }
 
 // databaseUrl is the postgres database to connect to.
@@ -789,6 +849,7 @@ func RunScraper(ctx context.Context, databaseUrl string, evictionRatio float64, 
 				StreamId:             liveStream.StreamID,
 				StartTimeUnix:        liveStream.StartTime.UTC().Unix(),
 				StreamerLoginAtStart: liveStream.StreamerLoginAtStart,
+				GameIdAtStart:        liveStream.GameIDAtStart,
 				MaxViews:             int(liveStream.MaxViews),
 				LastUpdatedUnix:      liveStream.LastUpdatedAt.UTC().Unix(),
 				LastInteractionUnix:  lastInteraction.Unix(),
