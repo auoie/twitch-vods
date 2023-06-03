@@ -36,9 +36,16 @@ resource "linode_firewall" "firewall" {
     label    = "allow-https"
     action   = "ACCEPT"
     protocol = "TCP"
-    ports    = "443,1936"
+    ports    = "443"
     ipv4     = ["0.0.0.0/0"]
     ipv6     = ["::/0"]
+  }
+  inbound {
+    label    = "allow-statistics"
+    action   = "ACCEPT"
+    protocol = "TCP"
+    ports    = "1936"
+    ipv4     = ["${var.ip_address}/32"]
   }
   outbound_policy = "ACCEPT"
   linodes         = [linode_instance.instance.id]
