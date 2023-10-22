@@ -197,6 +197,11 @@ func makeLanguagesListHandler(languagesLock *LockValue[[]*sqlvods.GetLanguagesRo
 		w.Write(bytes)
 	}
 }
+func swap[T any](vals []T, i, j int) {
+	if i != j {
+		vals[i], vals[j] = vals[j], vals[i]
+	}
+}
 
 func makeSearchHandler(ctx context.Context, regexCheck *regexp.Regexp, queries *sqlvods.Queries) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
@@ -205,13 +210,22 @@ func makeSearchHandler(ctx context.Context, regexCheck *regexp.Regexp, queries *
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		results, err := queries.GetMatchingStreamers(ctx, sqlvods.GetMatchingStreamersParams{Limit: 20, StreamerLoginAtStart: fmt.Sprint("%", streamer, "%")})
+		results, err := queries.GetMatchingStreamers(ctx, sqlvods.GetMatchingStreamersParams{
+			Limit:                  20,
+			StreamerLoginAtStart:   streamer,
+			StreamerLoginAtStart_2: fmt.Sprint("%", streamer, "%")})
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 		if results == nil {
 			results = []*sqlvods.GetMatchingStreamersRow{}
+		}
+		for i := 0; i < len(results); i++ {
+			if streamer == results[i].StreamerLoginAtStart {
+				swap(results, 0, i)
+				break
+			}
 		}
 		bytes, err := json.Marshal(results)
 		if err != nil {

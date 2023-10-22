@@ -537,7 +537,7 @@ docker run -d --restart always \
   --network twitch-vods-network \
   -v ~/docker/twitch-vods/twitch-vods-caddy/Caddyfile:/etc/caddy/Caddyfile:ro \
   -p 3000:3000 \
-  caddy:2.6-alpine
+  caddy:2.7-alpine
 mkdir -p ~/docker/twitch-vods/twitch-vods-nginx
 cp ./reverse-proxy/nginx/dev/nginx.conf ~/docker/twitch-vods/twitch-vods-nginx
 docker run -d --restart always \
@@ -545,7 +545,7 @@ docker run -d --restart always \
   --network twitch-vods-network \
   -v ~/docker/twitch-vods/twitch-vods-nginx/nginx.conf:/etc/nginx/nginx.conf:ro \
   -p 4000:4000 \
-  nginx:1.23
+  nginx:1.25
 mkdir -p ~/docker/twitch-vods/twitch-vods-haproxy
 cp ./reverse-proxy/haproxy/dev/haproxy.cfg ~/docker/twitch-vods/twitch-vods-haproxy
 docker run -d --restart always \
@@ -553,7 +553,7 @@ docker run -d --restart always \
   --network twitch-vods-network \
   -v ~/docker/twitch-vods/twitch-vods-haproxy:/usr/local/etc/haproxy:ro \
   -p 5000:3000 \
-  haproxy:2.7
+  haproxy:2.8
 ```
 
 ## Migrating from Old Docker to New Docker
@@ -826,7 +826,7 @@ docker run -d --restart always \
   -v ~/docker/twitch-vods/twitch-vods-db/app:/home/app \
   --network host\
   postgres:15
-migrate -source file://sqlc/migrations -database $DOCKER_POSTGERS_DB up
+migrate -source file://sqlc/migrations -database $DOCKER_POSTGRES_DB up
 
 # before running the stateless stuff below, migrate the data from the previous database
 docker run -d --restart always \
@@ -1033,6 +1033,40 @@ Also, this is minor:
    | While not properly invalid, you will certainly encounter various problems
    | with such a configuration. To fix this, please ensure that all following
    | timeouts are set to a non-zero value: 'client', 'connect', 'server'.
+```
+
+## Twitch Client ID and Client Secret
+
+See [here](https://dev.twitch.tv/docs/api/get-started/) to get a Twitch client ID and client secret.
+User separate ones for development and for production.
+For debugging, I recommend running `docker logs -f twitch-vods-scraper`.
+
+## Updating Just the String API
+
+Source the `$REMOTE` variable.
+Then
+
+```bash
+docker save -o ~/docker/twitch-vods/images/twitch-vods-string-api.tar twitch-vods-string-api:latest
+docker save -o ~/docker/twitch-vods/images/twitch-vods-scraper.tar twitch-vods-scraper:latest
+rsync -avzhP --compress-choice=zstd --compress-level=1 --checksum-choice=xxh3 ~/docker/twitch-vods/images/ $REMOTE:docker/twitch-vods/images/
+ssh $REMOTE
+# set PASSWORD env variable
+# set CLIENT_ID env variable
+# set CLIENT_SECRET env variable
+# set CLIENT_URL env variable
+# set DOCKER_POSTGRES_DB env variable
+docker stop twitch-vods-string-api && \
+  docker rm twitch-vods-string-api && \
+  docker image rm twitch-vods-string-api:latest && \
+  docker load -i ~/docker/twitch-vods/images/twitch-vods-string-api.tar && \
+  docker run -d --restart always \
+    --name twitch-vods-string-api \
+    -e DATABASE_URL=$DOCKER_POSTGRES_DB \
+    -e PORT=3000 \
+    -e CLIENT_URL=$CLIENT_URL \
+    --network twitch-vods-network \
+    twitch-vods-string-api
 ```
 
 ## TODO

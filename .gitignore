@@ -1,6 +1,6 @@
 /.vscode/
 migration_lock.toml
-/.env
+/*.env
 *.tfvars
 .terraform/
 *.tfstate

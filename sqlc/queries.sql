@@ -146,14 +146,21 @@ ORDER BY
 LIMIT $3;
 
 -- name: GetMatchingStreamers :many
-SELECT
+(SELECT 
   profile_image_url_at_start, streamer_login_at_start
 FROM
   streamers
 WHERE
-  streamer_login_at_start ILIKE $1
+  streamers.streamer_login_at_start = $1)
+UNION
+(SELECT
+  profile_image_url_at_start, streamer_login_at_start
+FROM
+  streamers
+WHERE
+  streamers.streamer_login_at_start ILIKE $2
 LIMIT
-  $2;
+  $3);
 
 -- name: GetPopularCategories :many
 WITH
