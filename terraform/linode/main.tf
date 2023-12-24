@@ -54,7 +54,7 @@ resource "linode_firewall" "firewall" {
 resource "linode_instance" "instance" {
   image           = "linode/ubuntu22.04"
   region          = "us-west"
-  type            = "g6-standard-1"
+  type            = "g6-standard-2"
   authorized_keys = [trimspace(file("~/.ssh/id_ed25519.pub"))]
 }
 
