@@ -6,3 +6,5 @@ migration_lock.toml
 *.tfstate
 *.tfstate.backup
 *.pem
+*.gz
+*.zstd

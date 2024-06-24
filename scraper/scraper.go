@@ -10,12 +10,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/4kills/go-libdeflate/v2"
 	"github.com/auoie/goVods/vods"
 	"github.com/auoie/twitch-vods/sqlvods"
 	"github.com/grafov/m3u8"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/jdvr/go-again"
+	"github.com/klauspost/compress/zstd"
 	"github.com/nicklaw5/helix"
 )
 
@@ -405,14 +405,8 @@ func getCleanedMediaPlaylistBytes(dwp *vods.ValidDwpResponse) (*m3u8.MediaPlayli
 	return mediapl, nil
 }
 
-func getCompressedBytes(bytes []byte, compressor *libdeflate.Compressor) ([]byte, error) {
-	compressedBytes := make([]byte, len(bytes))
-	n, _, err := compressor.Compress(bytes, compressedBytes, libdeflate.ModeGzip)
-	if err != nil {
-		return nil, err
-	}
-	compressedBytes = compressedBytes[:n]
-	return compressedBytes, nil
+func getCompressedBytes(bytes []byte, compressor *zstd.Encoder) []byte {
+	return compressor.EncodeAll(bytes, nil)
 }
 
 // Find the .m3u8 for a video and return the compressed bytes.
@@ -444,7 +438,7 @@ func getValidDwp(ctx context.Context, videoData *vods.VideoData, client *http.Cl
 	return dwp, err
 }
 
-func getVodCompressedBytes(ctx context.Context, videoData *vods.VideoData, compressor *libdeflate.Compressor, client *http.Client) (*vodCompressedBytesResult, error) {
+func getVodCompressedBytes(ctx context.Context, videoData *vods.VideoData, compressor *zstd.Encoder, client *http.Client) (*vodCompressedBytesResult, error) {
 	dwp, err := getValidDwp(ctx, videoData, client)
 	if err != nil {
 		log.Println(fmt.Sprint("Link was not found for ", videoData.StreamerName, " because: ", err))
@@ -457,11 +451,7 @@ func getVodCompressedBytes(ctx context.Context, videoData *vods.VideoData, compr
 		return nil, err
 	}
 	duration := vods.GetMediaPlaylistDuration(mediapl)
-	compressedBytes, err := getCompressedBytes(mediapl.Encode().Bytes(), compressor)
-	if err != nil {
-		log.Println(fmt.Sprint("Compressing failed for ", videoData.StreamerName, " because: ", err))
-		return nil, err
-	}
+	compressedBytes := getCompressedBytes(mediapl.Encode().Bytes(), compressor)
 	return &vodCompressedBytesResult{compressedBytes: compressedBytes, dwp: dwp.Dwp, duration: duration}, nil
 }
 
@@ -479,7 +469,7 @@ func SetProfileImageWidth(profileImageUrl string, width int) string {
 	return strings.Replace(profileImageUrl, "-300x300.png", fmt.Sprint("-", width, "x", width, ".png"), 1)
 }
 
-func getVideoStatus(ctx context.Context, client *helix.Client, streamerId string, streamId string, gameId string) videoStatus {
+func getVideoStatus(client *helix.Client, streamerId string, streamId string, gameId string) videoStatus {
 	var public sql.NullBool
 	{
 		response, err := retryOnError(func() (*helix.VideosResponse, error) {
@@ -534,7 +524,7 @@ type hlsWorkerFetchCompressSendParams struct {
 	httpClient        *http.Client
 	oldVodJobsCh      chan *LiveVod
 	hlsFetcherDelay   time.Duration
-	compressor        *libdeflate.Compressor
+	compressor        *zstd.Encoder
 	resultsCh         chan *VodResult
 	requestTimeLimit  time.Duration
 }
@@ -588,7 +578,7 @@ func hlsWorkerFetchCompressSend(params hlsWorkerFetchCompressSendParams) {
 				},
 			}
 		}
-		videoMeta := getVideoStatus(params.ctx, params.twitchHelixClient, oldVod.StreamerId, oldVod.StreamId, oldVod.GameIdAtStart)
+		videoMeta := getVideoStatus(params.twitchHelixClient, oldVod.StreamerId, oldVod.StreamId, oldVod.GameIdAtStart)
 		result.Public = videoMeta.public
 		result.BoxArtUrl = videoMeta.boxArtUrl
 		result.ProfileImageUrl = videoMeta.profileImageUrl
@@ -722,7 +712,7 @@ func ScrapeTwitchLiveVodsWithGqlApi(ctx context.Context, params ScrapeTwitchLive
 		maxOldVodsQueueSize: params.MaxOldVodsQueueSize,
 	})
 	for i := 0; i < params.NumHlsFetchers; i++ {
-		compressor, err := libdeflate.NewCompressorLevel(params.LibdeflateCompressionLevel)
+		compressor, err := zstd.NewWriter(nil, zstd.WithEncoderLevel(zstd.SpeedDefault))
 		if err != nil {
 			return err
 		}
@@ -732,7 +722,7 @@ func ScrapeTwitchLiveVodsWithGqlApi(ctx context.Context, params ScrapeTwitchLive
 			httpClient:        httpClient,
 			oldVodJobsCh:      oldVodJobsCh,
 			hlsFetcherDelay:   params.HlsFetcherDelay,
-			compressor:        &compressor,
+			compressor:        compressor,
 			resultsCh:         resultsCh,
 			requestTimeLimit:  params.RequestTimeLimit,
 		})
@@ -791,17 +781,13 @@ func RunScraper(ctx context.Context, databaseUrl string, evictionRatio float64, 
 		waitVodQueue *waitVodsPriorityQueue
 	}
 	getInitialState := func(ctx context.Context) (*tInitialState, error) {
-		compressor, err := libdeflate.NewCompressorLevel(params.LibdeflateCompressionLevel)
+		compressor, err := zstd.NewWriter(nil, zstd.WithEncoderLevel(zstd.SpeedDefault))
 		if err != nil {
 			log.Println(fmt.Sprint("failed to create compressor: ", err))
 			return nil, err
 		}
-		_, err = getCompressedBytes([]byte("Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet."), &compressor)
+		_ = getCompressedBytes([]byte("Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet."), compressor)
 		compressor.Close()
-		if err != nil {
-			log.Println(fmt.Sprint("failed to compress: ", err))
-			return nil, err
-		}
 		testClient := makeRobustHttpClient(params.RequestTimeLimit)
 		resp, err := retryOnError(func() (*http.Response, error) {
 			return testClient.Get(vods.DOMAINS[0])

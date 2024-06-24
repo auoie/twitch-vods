@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -17,6 +19,7 @@ import (
 	"github.com/auoie/twitch-vods/sqlvods"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/julienschmidt/httprouter"
+	"github.com/klauspost/compress/zstd"
 )
 
 var ErrParse = errors.New("must contain @")
@@ -158,15 +161,42 @@ func makeM3U8Handler(ctx context.Context, queries *sqlvods.Queries) httprouter.H
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		bytes := streams[0]
-		if bytes == nil {
+		db_bytes := streams[0]
+		if db_bytes == nil {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		w.Header().Set("Content-Length", strconv.Itoa(len(bytes)))
+		decompressor, err := zstd.NewReader(nil)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		m3u8_bytes, err := decompressor.DecodeAll(db_bytes, nil)
+		defer decompressor.Close()
+		if err != nil {
+			w.Header().Set("Content-Length", strconv.Itoa(len(db_bytes)))
+			w.Header().Set("Content-Type", "application/x-mpegURL")
+			w.Header().Set("Content-Encoding", "gzip")
+			w.Write(db_bytes)
+			return
+		}
+		gzip_buf := bytes.Buffer{}
+		compressor := gzip.NewWriter(&gzip_buf)
+		_, err = compressor.Write(m3u8_bytes)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		err = compressor.Close()
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		gzip_bytes := gzip_buf.Bytes()
+		w.Header().Set("Content-Length", strconv.Itoa(len(gzip_bytes)))
 		w.Header().Set("Content-Type", "application/x-mpegURL")
 		w.Header().Set("Content-Encoding", "gzip")
-		w.Write(bytes)
+		w.Write(gzip_bytes)
 	}
 }
 
