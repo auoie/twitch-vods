@@ -786,6 +786,7 @@ func RunScraper(ctx context.Context, databaseUrl string, evictionRatio float64, 
 			log.Println(fmt.Sprint("failed to create compressor: ", err))
 			return nil, err
 		}
+		log.Println(fmt.Sprint("created compressor"))
 		_ = getCompressedBytes([]byte("Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet."), compressor)
 		compressor.Close()
 		testClient := makeRobustHttpClient(params.RequestTimeLimit)
@@ -796,6 +797,7 @@ func RunScraper(ctx context.Context, databaseUrl string, evictionRatio float64, 
 			log.Println(fmt.Sprint("failed to establish test connection to domain: ", err))
 			return nil, err
 		}
+		log.Println("established test connection to domain")
 		resp.Body.Close()
 		conn, err := pgxpool.Connect(ctx, databaseUrl)
 		if err != nil {
@@ -808,6 +810,7 @@ func RunScraper(ctx context.Context, databaseUrl string, evictionRatio float64, 
 			conn.Close()
 			return nil, err
 		}
+		log.Println("successfully pinged")
 		queries := sqlvods.New(conn)
 		latestStreams, err := queries.GetLatestStreams(ctx, 1)
 		if err != nil {

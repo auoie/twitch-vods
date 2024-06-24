@@ -22,6 +22,7 @@ func main() {
 	if !ok {
 		log.Fatal("CLIENT_SECRET is missing for twitch helix API")
 	}
+	log.Println("running scraper forever")
 	scraper.RunScraperForever(
 		context.Background(),
 		24*time.Hour*7,

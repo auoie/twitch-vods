@@ -1084,3 +1084,49 @@ docker stop twitch-vods-string-api && \
   Maybe put these in a database so that I can retrieve them if the program restarts.
   Maybe have some additional service that monitors for client id and cloudfront domains to periodically update the database.
 - Maybe update the list of domains with the domains retrieved via graphql and persist this to DB
+
+### Migation to Zstd
+
+Local
+
+```bash
+docker build -f ./docker/stringApi/Dockerfile -t twitch-vods-string-api:latest . --progress plain
+docker build -f ./docker/scraper/Dockerfile -t twitch-vods-scraper:latest . --progress plain
+docker save -o ~/docker/twitch-vods/images/twitch-vods-scraper.tar twitch-vods-scraper:latest
+docker save -o ~/docker/twitch-vods/images/twitch-vods-string-api.tar twitch-vods-string-api:latest
+rsync -avzhP --compress-choice=zstd --compress-level=1 --checksum-choice=xxh3 ~/docker/twitch-vods/images/ $REMOTE:docker/twitch-vods/images/
+```
+
+Remote
+
+```bash
+# copy .env vars from ./.prod.env
+docker load -i ~/docker/twitch-vods/images/twitch-vods-scraper.tar
+docker load -i ~/docker/twitch-vods/images/twitch-vods-string-api.tar
+
+docker stop twitch-vods-string-api && docker rm twitch-vods-string-api
+docker run -d --restart always \
+  --name twitch-vods-string-api \
+  -e DATABASE_URL=$DOCKER_POSTGRES_DB \
+  -e PORT=3000 \
+  -e CLIENT_URL=$CLIENT_URL \
+  --network twitch-vods-network \
+  twitch-vods-string-api
+docker stop twitch-vods-scraper && docker rm twitch-vods-scraper
+docker run -d --restart always \
+  --name twitch-vods-scraper \
+  -e DATABASE_URL=$DOCKER_POSTGRES_DB \
+  -e CLIENT_ID=$CLIENT_ID \
+  -e CLIENT_SECRET=$CLIENT_SECRET \
+  --network twitch-vods-network \
+  twitch-vods-scraper
+```
+
+It was a little bit strange.
+The new docker container (twitch-vods-string-api) didn't work at first.
+It doesn't able to resolve the hostname `twitch-vods-db`.
+I got this by viewing the logs with `docker logs twitch-vods-string-api`.
+I'm not sure why.
+Also, the old Dockerfile for `twitch-vods-scraper` stopped working.
+During compilation, it wasn't able to resolve `cgo` or something.
+Otherwise, it seems to work.
