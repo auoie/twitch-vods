@@ -1057,16 +1057,16 @@ ssh $REMOTE
 # set CLIENT_URL env variable
 # set DOCKER_POSTGRES_DB env variable
 docker stop twitch-vods-string-api && \
-  docker rm twitch-vods-string-api && \
-  docker image rm twitch-vods-string-api:latest && \
-  docker load -i ~/docker/twitch-vods/images/twitch-vods-string-api.tar && \
-  docker run -d --restart always \
-    --name twitch-vods-string-api \
-    -e DATABASE_URL=$DOCKER_POSTGRES_DB \
-    -e PORT=3000 \
-    -e CLIENT_URL=$CLIENT_URL \
-    --network twitch-vods-network \
-    twitch-vods-string-api
+docker rm twitch-vods-string-api && \
+docker image rm twitch-vods-string-api:latest && \
+docker load -i ~/docker/twitch-vods/images/twitch-vods-string-api.tar && \
+docker run -d --restart always \
+  --name twitch-vods-string-api \
+  -e DATABASE_URL=$DOCKER_POSTGRES_DB \
+  -e PORT=3000 \
+  -e CLIENT_URL=$CLIENT_URL \
+  --network twitch-vods-network \
+  twitch-vods-string-api
 ```
 
 ## TODO
@@ -1130,3 +1130,62 @@ I'm not sure why.
 Also, the old Dockerfile for `twitch-vods-scraper` stopped working.
 During compilation, it wasn't able to resolve `cgo` or something.
 Otherwise, it seems to work.
+
+### Docker Logging
+
+By default, docker logs grow without bound.
+See the [documentation](https://docs.docker.com/config/containers/logging/configure/).
+Change this.
+Add the following in the log file in `/etc/docker/daemon.json`.
+
+```json
+{
+  "log-driver": "local"
+}
+```
+
+To get the log files for a container
+
+```bash
+docker inspect --format='{{.LogPath}}' twitch-vods-string-api
+```
+
+You have to stop and remove all of the docker containers.
+Then recreate them
+
+```bash
+docker stop twitch-vods-string-api && docker rm twitch-vods-string-api
+docker stop twitch-vods-scraper && docker rm twitch-vods-scraper
+docker stop twitch-vods-haproxy && docker rm twitch-vods-haproxy
+docker stop twitch-vods-db && docker rm twitch-vods-db
+docker run -d --restart always \
+  --name twitch-vods-db \
+  -e POSTGRES_USER="twitch-vods-admin" \
+  -e POSTGRES_PASSWORD=$PASSWORD \
+  -e POSTGRES_DB="twitch-vods" \
+  -v ~/docker/twitch-vods/twitch-vods-db/data:/var/lib/postgresql/data \
+  -v ~/docker/twitch-vods/twitch-vods-db/app:/home/app \
+  --network twitch-vods-network \
+  postgres:15
+docker run -d --restart always \
+  --name twitch-vods-string-api \
+  -e DATABASE_URL=$DOCKER_POSTGRES_DB \
+  -e PORT=3000 \
+  -e CLIENT_URL=$CLIENT_URL \
+  --network twitch-vods-network \
+  twitch-vods-string-api
+docker run -d --restart always \
+  --name twitch-vods-scraper \
+  -e DATABASE_URL=$DOCKER_POSTGRES_DB \
+  -e CLIENT_ID=$CLIENT_ID \
+  -e CLIENT_SECRET=$CLIENT_SECRET \
+  --network twitch-vods-network \
+  twitch-vods-scraper
+docker run -d --restart always \
+  --name twitch-vods-haproxy \
+  --network twitch-vods-network \
+  -v ~/docker/twitch-vods/twitch-vods-haproxy:/usr/local/etc/haproxy:ro \
+  -p 443:443 \
+  -p 1936:1936 \
+  haproxy:2.7
+```
