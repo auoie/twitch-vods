@@ -414,7 +414,7 @@ SELECT COUNT(*) FROM streams WHERE public = True AND last_updated_at BETWEEN NOW
   I find these streams with
 
   ```sql
-  WITH high_count AS (SELECT stream_id FROM streams GROUP BY stream_id HAVING COUNT(*) >= 2 ORDER BY COUNT(*) DESC LIMIT 50) SELECT streams.stream_id, streamer_login_at_start, max_views, public, sub_only, bytes_found, start_time, streamer_id, LEFT(title_at_start, 30), recording_fetched_at, last_updated_at, game_name_at_start FROM streams INNER JOIN high_count ON streams.stream_id = high_count.stream_id ORDER BY (streams.stream_id, last_updated_at);
+  WITH high_count AS (SELECT stream_id FROM streams GROUP BY stream_id HAVING COUNT(*) >= 2 ORDER BY COUNT(*) DESC LIMIT 50) SELECT streams.stream_id, streamer_login_at_start, max_views, public, bytes_found, start_time, streamer_id, LEFT(title_at_start, 30), recording_fetched_at, last_updated_at, game_name_at_start FROM streams INNER JOIN high_count ON streams.stream_id = high_count.stream_id ORDER BY (streams.stream_id, last_updated_at);
   ```
 
   A corollary is if the stream is restarted a second time and it starts at the same second, I'm guessing the previous stream could be overwritten.
