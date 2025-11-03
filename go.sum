@@ -20,6 +20,10 @@ github.com/auoie/first-nonerr v1.1.0 h1:vkaDz/knRJoxDw5mcWbDzODHVfrcEUMO4o3P0jH/
 github.com/auoie/first-nonerr v1.1.0/go.mod h1:XerIRw/odoNPX7gyOyrPeTFIOJa9OL0eOUmELhol4Ts=
 github.com/auoie/goVods v0.5.0 h1:zjy7G5gIOh4JkK7Wm43BI5NDYTiI8tZ/oRmrThiW6k0=
 github.com/auoie/goVods v0.5.0/go.mod h1:3OtoHIIl4R24+rx24xI48+gztRaC8T+STt3+J1e90Bo=
+github.com/auoie/goVods v0.6.0 h1:LecryV/xsoj1HB38DKCvDXSsCsxzKidIW/b6rjYPhWQ=
+github.com/auoie/goVods v0.6.0/go.mod h1:3OtoHIIl4R24+rx24xI48+gztRaC8T+STt3+J1e90Bo=
+github.com/auoie/goVods v0.7.0 h1:9RIa/ACUYsvoWZo+TcghZ/DrHN3LsFvqFniXXUZBEVg=
+github.com/auoie/goVods v0.7.0/go.mod h1:3OtoHIIl4R24+rx24xI48+gztRaC8T+STt3+J1e90Bo=
 github.com/bradleyjkemp/cupaloy/v2 v2.6.0 h1:knToPYa2xtfg42U3I6punFEjaGFKWQRXJwj0JTv4mTs=
 github.com/cockroachdb/apd v1.1.0 h1:3LFP3629v+1aKXU5Q37mxmRxX/pIu1nijXydLShEq5I=
 github.com/cockroachdb/apd v1.1.0/go.mod h1:8Sl8LxpKi29FqWXR16WEFZRNSz3SoPzUzeMeY4+DwBQ=
