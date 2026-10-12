@@ -8,6 +8,17 @@ WHERE
   start_time = $2
 LIMIT 1;
 
+-- name: GetRecentRecordings :many
+SELECT
+  gzipped_bytes
+FROM
+  streams
+WHERE
+  gzipped_bytes IS NOT NULL AND
+  recording_fetched_at >= $1
+ORDER BY recording_fetched_at DESC
+LIMIT 400;
+
 -- name: GetLatestStreamsFromStreamerLogin :many
 WITH
   goal_id AS

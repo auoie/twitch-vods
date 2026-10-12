@@ -7,7 +7,11 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"regexp"
+	"sort"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/auoie/goVods/vods"
@@ -388,7 +392,7 @@ func processOldVodJobs(params processOldVodJobsParams) {
 }
 
 func getFirstValidDwpResponse(ctx context.Context, videoData *vods.VideoData, toUnix bool, client *http.Client) (*vods.ValidDwpResponse, error) {
-	dwp, err := vods.GetFirstValidDwp(ctx, videoData.GetDomainWithPathsList(vods.DOMAINS, 1, toUnix), client)
+	dwp, err := vods.GetFirstValidDwp(ctx, videoData.GetDomainWithPathsList(getScanDomains(), 1, toUnix), client)
 	if err != nil {
 		return nil, err
 	}
@@ -416,7 +420,16 @@ type vodCompressedBytesResult struct {
 	duration        time.Duration
 }
 
-func getValidDwp(ctx context.Context, videoData *vods.VideoData, client *http.Client) (*vods.ValidDwpResponse, error) {
+func getValidDwp(ctx context.Context, videoData *vods.VideoData, client *http.Client, preferred *vods.DomainWithPath) (*vods.ValidDwpResponse, error) {
+	// The thumbnail-derived URL is Twitch's own pointer to the recording; when present
+	// it replaces the distro × timestamp scan entirely.
+	if preferred != nil {
+		if body, err := preferred.GetM3U8Body(ctx, client); err == nil {
+			return &vods.ValidDwpResponse{Dwp: preferred, Body: body}, nil
+		} else {
+			log.Println(fmt.Sprint("thumbnail-derived url failed for ", videoData, ": ", err))
+		}
+	}
 	dwp, err := getFirstValidDwpResponse(ctx, videoData, true, client)
 	if err == nil {
 		return dwp, nil
@@ -438,8 +451,8 @@ func getValidDwp(ctx context.Context, videoData *vods.VideoData, client *http.Cl
 	return dwp, err
 }
 
-func getVodCompressedBytes(ctx context.Context, videoData *vods.VideoData, compressor *zstd.Encoder, client *http.Client) (*vodCompressedBytesResult, error) {
-	dwp, err := getValidDwp(ctx, videoData, client)
+func getVodCompressedBytes(ctx context.Context, videoData *vods.VideoData, compressor *zstd.Encoder, client *http.Client, preferred *vods.DomainWithPath) (*vodCompressedBytesResult, error) {
+	dwp, err := getValidDwp(ctx, videoData, client, preferred)
 	if err != nil {
 		log.Println(fmt.Sprint("Link was not found for ", videoData.StreamerName, " because: ", err))
 		return nil, err
@@ -459,7 +472,141 @@ type videoStatus struct {
 	public          sql.NullBool
 	boxArtUrl       sql.NullString
 	profileImageUrl sql.NullString
+	thumbDwp        *vods.DomainWithPath
 }
+
+// Twitch publishes the full VOD directory (including the CDN distribution) in every
+// video's thumbnail_url, e.g.
+//   https://static-cdn.jtvnw.net/cf_vods/d1m7jfoe9zdc1j/36c663f90afb445621c4_sodapoppin_321790810458_1791655055//thumb/thumb0-%{width}x%{height}.jpg
+// Parsing it removes the need to scan a hardcoded CloudFront distro pool.
+var cfVodsThumbnailRegex = regexp.MustCompile(`cf_vods/([a-z0-9.\-]+)/([0-9a-f]{20})_(.+)_([0-9]+)_([0-9]+)//thumb/`)
+
+// Distros seen in recent thumbnails, most recent first. The static vods.DOMAINS list
+// is the bootstrap; this map keeps the scan pool current without manual updates.
+var harvestedDomains = struct {
+	sync.Mutex
+	m map[string]time.Time
+}{m: map[string]time.Time{}}
+
+func harvestDomain(distro string) {
+	harvestedDomains.Lock()
+	harvestedDomains.m[distro] = time.Now().UTC()
+	harvestedDomains.Unlock()
+}
+
+func getScanDomains() []string {
+	harvestedDomains.Lock()
+	type seenAt struct {
+		distro string
+		seen   time.Time
+	}
+	snapshot := make([]seenAt, 0, len(harvestedDomains.m))
+	for distro, seen := range harvestedDomains.m {
+		// forget distros not seen for a long time so dead ones rotate out
+		if time.Since(seen) > 60*24*time.Hour {
+			delete(harvestedDomains.m, distro)
+			continue
+		}
+		snapshot = append(snapshot, seenAt{distro, seen})
+	}
+	harvestedDomains.Unlock()
+	// sort the snapshot, not the live map: the comparator must not touch shared state
+	sort.Slice(snapshot, func(i, j int) bool {
+		return snapshot[i].seen.After(snapshot[j].seen)
+	})
+	seen := map[string]bool{}
+	domains := make([]string, 0, len(snapshot)+len(vods.DOMAINS))
+	for _, s := range snapshot {
+		domain := fmt.Sprintf("https://%s.cloudfront.net/", s.distro)
+		if !seen[domain] {
+			seen[domain] = true
+			domains = append(domains, domain)
+		}
+	}
+	for _, domain := range vods.DOMAINS {
+		if !seen[domain] {
+			seen[domain] = true
+			domains = append(domains, domain)
+		}
+	}
+	return domains
+}
+
+// Returns nil if the thumbnail URL does not describe a cf_vods directory.
+func dwpFromThumbnailURL(thumbnailUrl string, videoData *vods.VideoData) *vods.DomainWithPath {
+	m := cfVodsThumbnailRegex.FindStringSubmatch(thumbnailUrl)
+	if m == nil {
+		return nil
+	}
+	distro, sha, login, iid, ts := m[1], m[2], m[3], m[4], m[5]
+	harvestDomain(distro)
+	// The directory must describe the VOD we are looking for. The stream ID is the
+	// identity check; login and ts are informational (ts in the thumbnail is the
+	// authoritative recording-start time and may differ from our seed by a second).
+	if videoData != nil && iid != videoData.VideoId {
+		return nil
+	}
+	if videoData != nil && ts != strconv.FormatInt(videoData.Time.Unix(), 10) {
+		log.Println(fmt.Sprint("thumbnail ts ", ts, " differs from seed ", videoData.Time.Unix(), " for ", login))
+	}
+	return &vods.DomainWithPath{
+		Domain: fmt.Sprintf("https://%s.cloudfront.net/", distro),
+		Path: &vods.VideoPath{
+			UrlPath:   fmt.Sprint(sha, "_", login, "_", iid, "_", ts),
+			VideoData: videoData,
+		},
+	}
+}
+
+// SeedDomainsFromDB warms the harvested-distro pool from recordings stored by
+// previous runs. Without it, the pool stays cold after a restart until the first
+// public VOD statuses are fetched — a problem because waitVodQueue holds every
+// tracked stream for WaitVodEvictionThreshold (60 min) and then releases a burst
+// of jobs, and processOldVodJobs never retries failed fetches. Sub-only VODs in
+// that first burst would be scanned against a stale bootstrap pool.
+func SeedDomainsFromDB(ctx context.Context, queries *sqlvods.Queries) {
+	decoder, err := zstd.NewReader(nil)
+	if err != nil {
+		log.Println("SeedDomainsFromDB: zstd reader: ", err)
+		return
+	}
+	defer decoder.Close()
+	playlists, err := queries.GetRecentRecordings(ctx, sql.NullTime{Time: time.Now().UTC().Add(-14 * 24 * time.Hour), Valid: true})
+	if err != nil {
+		log.Println("SeedDomainsFromDB: query failed: ", err)
+		return
+	}
+	distros := distrosFromPlaylists(decoder, playlists)
+	for distro := range distros {
+		harvestDomain(distro)
+	}
+	log.Println(fmt.Sprint("SeedDomainsFromDB: seeded ", len(distros), " distros from ", len(playlists), " stored recordings"))
+}
+
+// distrosFromPlaylists decodes stored playlists and returns the set of canonical
+// CloudFront distros their segment URLs point at. Facade hosts (vod-*.twitch.tv)
+// and undecodable rows are skipped: only hosts that map cleanly to
+// {distro}.cloudfront.net are usable as scan candidates.
+func distrosFromPlaylists(decoder *zstd.Decoder, playlists [][]byte) map[string]bool {
+	distros := map[string]bool{}
+	for _, playlist := range playlists {
+		playlistBytes, err := decoder.DecodeAll(playlist, nil)
+		if err != nil {
+			continue // legacy rows stored with a different compression
+		}
+		for _, line := range strings.Split(string(playlistBytes), "\n") {
+			if m := cfVodsSegmentHostRegex.FindStringSubmatch(line); m != nil {
+				distros[m[1]] = true
+				break // every segment of a playlist lives on the same distro
+			}
+		}
+	}
+	return distros
+}
+
+// Segment URLs in stored playlists point at the canonical distro the recording
+// lives on: https://{distro}.cloudfront.net/{dir}/chunked/N.ts
+var cfVodsSegmentHostRegex = regexp.MustCompile(`https://([a-z0-9]+)\.cloudfront\.net/`)
 
 func SetBoxArtWidthHeight(boxArtUrl string, width int, height int) string {
 	return strings.Replace(boxArtUrl, "-{width}x{height}", fmt.Sprint("-", width, "x", height), 1)
@@ -471,9 +618,13 @@ func SetProfileImageWidth(profileImageUrl string, width int) string {
 
 func getVideoStatus(client *helix.Client, streamerId string, streamId string, gameId string) videoStatus {
 	var public sql.NullBool
+	var thumbDwp *vods.DomainWithPath
 	{
 		response, err := retryOnError(func() (*helix.VideosResponse, error) {
-			return client.GetVideos(&helix.VideosParams{UserID: streamerId})
+			// First: 100 because oldvodqueue reprocesses VODs up to retention age; heavy
+			// channels stream multiple times per day, so the default of 20 misses older
+			// VODs entirely (mislabeling them public=false and skipping their thumbnails).
+			return client.GetVideos(&helix.VideosParams{UserID: streamerId, First: 100})
 		})
 		if err != nil {
 			log.Println(fmt.Sprint("error getting user data for (", streamerId, ", ", streamId, "): ", err))
@@ -481,8 +632,12 @@ func getVideoStatus(client *helix.Client, streamerId string, streamId string, ga
 			public = sql.NullBool{Valid: true, Bool: false}
 			videos := response.Data.Videos
 			for _, cur := range videos {
+				// Every thumbnail publishes a cf_vods directory; harvest the distro
+				// even when it is not the video we are looking for.
+				dwpFromThumbnailURL(cur.ThumbnailURL, nil)
 				if cur.StreamID == streamId {
 					public = sql.NullBool{Valid: true, Bool: true}
+					thumbDwp = dwpFromThumbnailURL(cur.ThumbnailURL, nil)
 					break
 				}
 			}
@@ -515,6 +670,7 @@ func getVideoStatus(client *helix.Client, streamerId string, streamId string, ga
 		public:          public,
 		profileImageUrl: profileImageUrl,
 		boxArtUrl:       boxArtUrl,
+		thumbDwp:        thumbDwp,
 	}
 }
 
@@ -545,7 +701,10 @@ func hlsWorkerFetchCompressSend(params hlsWorkerFetchCompressSendParams) {
 		case oldVod = <-params.oldVodJobsCh:
 		}
 		requestInitiated := time.Now().UTC()
-		compressedBytesResult, err := getVodCompressedBytes(params.ctx, oldVod.GetVideoData(), params.compressor, params.httpClient)
+		// Fetch video status first: its thumbnails publish the exact cf_vods directory
+		// (distro included), which removes the need for the distro scan on public VODs.
+		videoMeta := getVideoStatus(params.twitchHelixClient, oldVod.StreamerId, oldVod.StreamId, oldVod.GameIdAtStart)
+		compressedBytesResult, err := getVodCompressedBytes(params.ctx, oldVod.GetVideoData(), params.compressor, params.httpClient, videoMeta.thumbDwp)
 		var result *VodResult
 		if err != nil {
 			result = &VodResult{
@@ -578,7 +737,6 @@ func hlsWorkerFetchCompressSend(params hlsWorkerFetchCompressSendParams) {
 				},
 			}
 		}
-		videoMeta := getVideoStatus(params.twitchHelixClient, oldVod.StreamerId, oldVod.StreamId, oldVod.GameIdAtStart)
 		result.Public = videoMeta.public
 		result.BoxArtUrl = videoMeta.boxArtUrl
 		result.ProfileImageUrl = videoMeta.profileImageUrl
@@ -812,6 +970,8 @@ func RunScraper(ctx context.Context, databaseUrl string, evictionRatio float64, 
 		}
 		log.Println("successfully pinged")
 		queries := sqlvods.New(conn)
+		// Warm the distro pool from history before any worker can need it.
+		SeedDomainsFromDB(ctx, queries)
 		latestStreams, err := queries.GetLatestStreams(ctx, 1)
 		if err != nil {
 			log.Println(fmt.Sprint("failed to get latest streams from ", databaseUrl, ": ", err))
