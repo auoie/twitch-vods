@@ -944,7 +944,7 @@ func RunScraper(ctx context.Context, databaseUrl string, evictionRatio float64, 
 			log.Println(fmt.Sprint("failed to create compressor: ", err))
 			return nil, err
 		}
-		log.Println(fmt.Sprint("created compressor"))
+		log.Println("created compressor")
 		_ = getCompressedBytes([]byte("Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet."), compressor)
 		compressor.Close()
 		testClient := makeRobustHttpClient(params.RequestTimeLimit)
