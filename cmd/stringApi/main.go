@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"regexp"
@@ -274,13 +275,109 @@ type TStreamResult[T any] struct {
 }
 
 type CustomHandler struct {
-	router    *httprouter.Router
-	clientUrl string
+	router        *httprouter.Router
+	clientUrl     string
+	requestLogger *log.Logger
+}
+
+// GET registers a route and records its pattern and params for the request log.
+func (ch *CustomHandler) GET(route string, handle httprouter.Handle) {
+	ch.router.GET(route, func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+		if rec, ok := w.(*responseRecorder); ok {
+			rec.route = route
+			rec.params = p
+		}
+		handle(w, r, p)
+	})
 }
 
 func (ch *CustomHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
 	w.Header().Set("Access-Control-Allow-Origin", ch.clientUrl)
-	ch.router.ServeHTTP(w, r)
+	rec := &responseRecorder{ResponseWriter: w, status: http.StatusOK}
+	ch.router.ServeHTTP(rec, r)
+	ch.logRequest(r, rec, start)
+}
+
+type responseRecorder struct {
+	http.ResponseWriter
+	status      int
+	bytes       int
+	wroteHeader bool
+	route       string
+	params      httprouter.Params
+}
+
+func (rec *responseRecorder) WriteHeader(status int) {
+	if !rec.wroteHeader {
+		rec.status = status
+		rec.wroteHeader = true
+	}
+	rec.ResponseWriter.WriteHeader(status)
+}
+
+func (rec *responseRecorder) Write(b []byte) (int, error) {
+	rec.wroteHeader = true
+	n, err := rec.ResponseWriter.Write(b)
+	rec.bytes += n
+	return n, err
+}
+
+type requestLogEntry struct {
+	Time       string            `json:"time"`
+	IP         string            `json:"ip"`
+	Country    string            `json:"country,omitempty"`
+	Method     string            `json:"method"`
+	Path       string            `json:"path"`
+	Route      string            `json:"route,omitempty"`
+	Params     map[string]string `json:"params,omitempty"`
+	Status     int               `json:"status"`
+	Bytes      int               `json:"bytes"`
+	DurationMs float64           `json:"duration_ms"`
+	Referer    string            `json:"referer,omitempty"`
+	UserAgent  string            `json:"user_agent,omitempty"`
+}
+
+// In production, haproxy only accepts Cloudflare authenticated origin pulls, so
+// CF-Connecting-IP can be trusted. Without Cloudflare (dev), fall back to the peer.
+func clientIP(r *http.Request) string {
+	if ip := r.Header.Get("CF-Connecting-IP"); ip != "" {
+		return ip
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
+}
+
+func (ch *CustomHandler) logRequest(r *http.Request, rec *responseRecorder, start time.Time) {
+	var params map[string]string
+	if len(rec.params) > 0 {
+		params = make(map[string]string, len(rec.params))
+		for _, p := range rec.params {
+			params[p.Key] = p.Value
+		}
+	}
+	entry, err := json.Marshal(requestLogEntry{
+		Time:       start.UTC().Format(time.RFC3339),
+		IP:         clientIP(r),
+		Country:    r.Header.Get("CF-IPCountry"),
+		Method:     r.Method,
+		Path:       r.URL.Path,
+		Route:      rec.route,
+		Params:     params,
+		Status:     rec.status,
+		Bytes:      rec.bytes,
+		DurationMs: float64(time.Since(start).Microseconds()) / 1000,
+		Referer:    r.Referer(),
+		UserAgent:  r.UserAgent(),
+	})
+	if err != nil {
+		log.Println(fmt.Sprint("failed to marshal request log: ", err))
+		return
+	}
+	ch.requestLogger.Println(string(entry))
 }
 
 type LockValue[T any] struct {
@@ -328,7 +425,8 @@ func main() {
 	}
 	queries := sqlvods.New(conn)
 	router := httprouter.New()
-	handler := &CustomHandler{router: router, clientUrl: clientUrl}
+	// Request logs go to stdout as JSON lines; other logs stay on stderr.
+	handler := &CustomHandler{router: router, clientUrl: clientUrl, requestLogger: log.New(os.Stdout, "", 0)}
 
 	// should use rabbitmq or apache kafka instead of polling every hour
 	categoriesLock := &LockValue[[]*sqlvods.GetPopularCategoriesRow]{}
@@ -383,16 +481,16 @@ func main() {
 	}
 
 	// pub-status: either public or private
-	router.GET("/", okHandler)
-	router.GET("/bing", bongHandler)
-	router.GET("/all/:pub-status", makeListHandler(ctx, queries, resultsGetPopularLiveStreams, linkGetPopularLiveStreams))
-	router.GET("/language/:language/all/:pub-status", makeListHandler(ctx, queries, resultsGetPopularLiveStreamsByLanguage, linkGetPopularLiveStreamsByLanguage))
-	router.GET("/category/:game-id/all/:pub-status", makeListHandler(ctx, queries, resultsGetPopularLiveStreamsByGameId, linkGetPopularLiveStreamsByGameId))
-	router.GET("/channels/:streamer", makeListHandler(ctx, queries, resultsGetLatestStreamsFromStreamerLogin, linkGetLatestStreamsFromStreamerLogin))
-	router.GET("/categories", makeCategoriesListHandler(categoriesLock))
-	router.GET("/languages", makeLanguagesListHandler(languagesLock))
-	router.GET("/search/:streamer", makeSearchHandler(ctx, twitchUsernameRegex, queries))
-	router.GET("/m3u8/:streamid/:unix/index.m3u8", makeM3U8Handler(ctx, queries))
+	handler.GET("/", okHandler)
+	handler.GET("/bing", bongHandler)
+	handler.GET("/all/:pub-status", makeListHandler(ctx, queries, resultsGetPopularLiveStreams, linkGetPopularLiveStreams))
+	handler.GET("/language/:language/all/:pub-status", makeListHandler(ctx, queries, resultsGetPopularLiveStreamsByLanguage, linkGetPopularLiveStreamsByLanguage))
+	handler.GET("/category/:game-id/all/:pub-status", makeListHandler(ctx, queries, resultsGetPopularLiveStreamsByGameId, linkGetPopularLiveStreamsByGameId))
+	handler.GET("/channels/:streamer", makeListHandler(ctx, queries, resultsGetLatestStreamsFromStreamerLogin, linkGetLatestStreamsFromStreamerLogin))
+	handler.GET("/categories", makeCategoriesListHandler(categoriesLock))
+	handler.GET("/languages", makeLanguagesListHandler(languagesLock))
+	handler.GET("/search/:streamer", makeSearchHandler(ctx, twitchUsernameRegex, queries))
+	handler.GET("/m3u8/:streamid/:unix/index.m3u8", makeM3U8Handler(ctx, queries))
 	log.Println(fmt.Sprint("Serving on port :", port))
 
 	http.ListenAndServe(fmt.Sprint(":", port), handler)
